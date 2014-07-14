@@ -2,7 +2,7 @@
 /*
 
 to compile:
-gcc -Wall -o nrrdread nrrdread.c -I/$TEEM/include -L/$TEEM/lib -lteem -lpng
+gcc -Wall -o nrrdread nrrdread.c -I/$TEEM/include -L/$TEEM/lib -Wl,-rpath,$TEEM/lib -lteem -lpng
 
 where $TEEM is the path into your teem-install directory
 (with bin, lib, and include subdirectories)
