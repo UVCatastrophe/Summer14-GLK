@@ -54,6 +54,35 @@ main(int argc, char **argv) {
      nrrdEmpty() frees the data but not the struct) */
   nrrdNuke(nin);
 
+  {
+    Nrrd *nout;
+    unsigned int sx=640, sy=480, xi, yi, idx;
+    unsigned char *odata, rr, gg, bb;
+    odata = (unsigned char *)(malloc(sx*sy*3));
+    for (yi=0; yi<sy; yi++) {
+      rr = (unsigned char)(AIR_AFFINE(0, yi, sy, 0, 255));
+      for (xi=0; xi<sx; xi++) {
+        gg = (unsigned char)(AIR_AFFINE(0, xi, sx, 0, 255));
+        bb = (unsigned char)(AIR_AFFINE(0, xi+yi, sx+sy, 0, 255));
+        idx = xi + sx*yi;
+        odata[0 + 3*idx] = rr;
+        odata[1 + 3*idx] = gg;
+        odata[2 + 3*idx] = bb;
+      }
+    }
+    /* assume unsigned char *odata has been already set */
+    nout = nrrdNew();
+    if (nrrdWrap_va(nout, odata, nrrdTypeUChar, 3,
+                    (size_t)3, (size_t)sx, (size_t)sy)
+        || nrrdSave("out.png", nout, NULL)) {
+      err = biffGetDone(NRRD);
+      fprintf(stderr, "%s: trouble wrapping image:\n%s", me, err);
+      free(err);
+      return 1;
+    }
+    nrrdNix(nout);
+    free(odata);
+  }
 
   return 0;
 }
