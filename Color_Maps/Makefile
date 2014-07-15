@@ -2,8 +2,8 @@ TEEM = /home/roman/teem-install
 
 CC = g++ -std=c++11 
 FLAGS = -lglfw3 -lGLU -lGL -lX11 -lXxf86vm -lXrandr -lpthread -lXi -lAntTweakBar -Wl,-rpath,$(TEEM)/lib -lteem -lpng
-INCLUDE = -I../AntTweakBar/include/ -I../CImg/ -I$(TEEM)/include
-LIB = -L../AntTweakBar/lib/ -L../CImg/ -L$(TEEM)/lib
+INCLUDE = -I../AntTweakBar/include/ -I$(TEEM)/include
+LIB = -L../AntTweakBar/lib/ -L$(TEEM)/lib
 SRC = color_maps.cpp shader.cpp shader.h
 
 All:
