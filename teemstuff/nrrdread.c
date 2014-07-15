@@ -70,7 +70,9 @@ main(int argc, char **argv) {
         odata[2 + 3*idx] = bb;
       }
     }
-    /* assume unsigned char *odata has been already set */
+
+    //Saves the contents of the buffer as a png image
+    //Currently upsidedown
     nout = nrrdNew();
     if (nrrdWrap_va(nout, odata, nrrdTypeUChar, 3,
                     (size_t)3, (size_t)sx, (size_t)sy)

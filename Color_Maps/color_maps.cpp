@@ -7,9 +7,10 @@
 #include <stdio.h>
 #include <iostream>
 #include "shader.h"
-#include "SOIL/SOIL.h"
-#include "CImg.h"
 #include <string>
+#include <teem/air.h>
+#include <teem/biff.h>
+#include <teem/nrrd.h>
 
 //Location of vertex position in shader
 #define  POSITION_ATTRIB 0
@@ -139,17 +140,6 @@ bool parse_args(int num, char** args){
 
   fileName = std::string(args[1]);
 
-  //Width and height must be provided due to the limitations of SOIL.
-  //This should be fixed once we switch to a new library.
-  if(num < 4){
-    std::cerr << "you must provide a width and height" << std::endl;
-    exit(0);
-  }
-
-  //TODO: check that atoi return correctly
-  pic_width = atoi(args[2]);
-  pic_height = atoi(args[3]);
-
   return true;
 
 }
@@ -218,22 +208,25 @@ void take_screenshot(void* clientData){
   glViewport(0,0,width,height);
 
   //The rendered image is read into ss
-GLvoid *ss = malloc(sizeof(unsigned char)*3*pic_width*pic_height);
+  GLvoid *ss = malloc(sizeof(unsigned char)*3*pic_width*pic_height);
   glReadPixels(0,0,pic_width,pic_height,GL_RGB,
 	       GL_UNSIGNED_BYTE,ss);
 
   //Used to save the rendered image
-  cimg_library::CImg<unsigned char> ss_out(pic_width,pic_height,1,3);
-  int x,y,c;
-  //Copy the data from ss into the image object
-  cimg_forXYC(ss_out,x,y,c){
-    ss_out(x,y,c) = ((char*)ss)[  (3*(pic_height - y) 
-				   * pic_width) + (3*x) + c];
-  }
+  Nrrd *nout = nrrdNew();
 
-  //Save the file
-  ss_out.save_png((fileOut + std::string(".png")).c_str());
-  free(ss);
+  char* err;
+    //Saves the contents of the buffer as a png image
+    //Currently upsidedown
+if (nrrdWrap_va(nout, ss, nrrdTypeUChar, 3,
+		(size_t)3, (size_t)pic_width, (size_t)pic_height)
+    || nrrdSave((fileOut + std::string(".png")).c_str(), nout, NULL)) {
+      err = biffGetDone(NRRD);
+      fprintf(stderr, "trouble wrapping image:\n%s", err);
+      free(err);
+      return;
+    }
+    nrrdNuke(nout);
 
   //Reset the transformation matrix
   init_matrix();
@@ -418,19 +411,57 @@ ShaderProgram* init_shader(){
  */
 GLuint init_texture(){
 
-  glActiveTexture(GL_TEXTURE0);
+  //Use teem to load the image
+  Nrrd *nrdImg = nrrdNew();
 
-  GLuint tex = SOIL_load_OGL_texture(
-				     fileName.c_str(),
-				     SOIL_LOAD_AUTO,
-				     SOIL_CREATE_NEW_ID,
-				     SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
-				     );
-
-  if(tex == 0){
-    std::cout << "error loading texture" << std::endl;
-    exit(0);
+  if(nrrdLoad(nrdImg,fileName.c_str(),NULL)){
+    char* err = biffGetDone(NRRD);
+    fprintf(stderr, "trouble reading \"%s\":\n%s", 
+	    fileName.c_str(), err);
+    free(err);
+    exit(1);
   }
+
+  GLuint tex;
+  glGenTextures(1, &tex);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D,tex);
+
+  GLuint tex_mode;
+  GLuint tex_size = GL_UNSIGNED_BYTE;
+
+  if( nrdImg->dim == 2){
+    pic_width = nrdImg->axis[0].size;
+    pic_height = nrdImg->axis[1].size;
+
+    tex_mode = GL_RED;
+  }
+
+  else{
+    pic_width = nrdImg->axis[1].size;
+    pic_height = nrdImg->axis[2].size;
+
+    switch(nrdImg->axis[0].size){
+    case 3:
+      tex_mode = GL_RGB;
+      break;
+    case 4:
+      tex_mode = GL_RGBA;
+      break;
+    }
+
+  }
+
+  glTexImage2D(GL_TEXTURE_2D, 0, tex_mode, pic_width, 
+	       pic_height, 0, tex_mode, tex_size, 
+	       nrdImg->data);
+
+  int e;
+  if((e = glGetError()) != GL_NO_ERROR)
+    std::cout << e << std::endl;
+
+  nrrdNuke(nrdImg);
 
   glBindTexture(GL_TEXTURE_2D,tex);
   
