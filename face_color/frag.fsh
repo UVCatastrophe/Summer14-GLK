@@ -10,7 +10,7 @@ out vec4 fcol;
 
 void main(void) {
     vec4 txt = texture(TextureUniform,tex_coord);
-    if(txt.x > .9 && txt.y > .9 && txt.z > .9){
+    if(txt.x > .9 || txt.y > .9 || txt.z > .9){
        fcol = vec4(color1,1.0);
 }
     else

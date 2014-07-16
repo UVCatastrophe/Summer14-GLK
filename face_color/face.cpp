@@ -35,6 +35,9 @@ GLuint shaderUniforms[4];
 /*Main display window*/
 GLFWwindow* window;
 
+/*Secondary Display Window for ATB*/
+GLFWwindow* windowATB;
+
 /* A rectangle which encompases the entire viewing area when 
  * drawn with GL_TRINAGLE_FAN */
 GLfloat vert_data[] = {
@@ -110,15 +113,16 @@ void render(void){
 
 /*Initializes the UI using AntTweakBar */
 void init_TW(){
+  glfwMakeContextCurrent(windowATB);
 
   TwInit(TW_OPENGL, NULL);
 
-  TwWindowSize(640,480);
+  TwWindowSize(200,300);
 
   //The Main Bar used throughout
   TwBar *bar = TwNewBar("TweakBar");
   TwDefine(" TweakBar size='200 300' ");
-  TwDefine(" TweakBar resizable=false ");
+  TwDefine(" TweakBar resizable=false movable=false contained=true alpha=255 position='0 0'");
 
   //The two colors which will be interpolated between
   TwAddVarRW(bar, "Color1", TW_TYPE_COLOR3F, color1,
@@ -128,10 +132,12 @@ void init_TW(){
 	     " label='Color2'");
 
   //Register callbacks for GLFW 
-  glfwSetMouseButtonCallback( window , MouseButtonCB );
-  glfwSetCursorPosCallback( window , MousePosCB);
-  glfwSetScrollCallback( window , MouseScrollCB );
-  glfwSetKeyCallback(window , KeyFunCB);
+  glfwSetMouseButtonCallback( windowATB , MouseButtonCB );
+  glfwSetCursorPosCallback( windowATB , MousePosCB);
+  glfwSetScrollCallback( windowATB , MouseScrollCB );
+  glfwSetKeyCallback(windowATB , KeyFunCB);
+
+  glfwMakeContextCurrent(window);
 }
 
 /*Initializes the the opengl Context, VAO's, shaders, and UI */
@@ -255,6 +261,12 @@ int main(int numArgs, char** args){
       exit(EXIT_FAILURE);
     }
 
+  windowATB = glfwCreateWindow(200,300, "ATB", NULL,NULL);
+  if(!windowATB){
+    glfwTerminate();
+    exit(EXIT_FAILURE);
+  }
+
   glfwMakeContextCurrent(window);
 
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -262,15 +274,20 @@ int main(int numArgs, char** args){
   init();
 
   while(!glfwWindowShouldClose(window)){
+    glfwMakeContextCurrent(window);
     render();//Render the image
+    glfwMakeContextCurrent(windowATB);
     TwDraw(); //Render AntTweakBar
     glfwWaitEvents(); //Only render a frame when a change is made
+    glfwSwapBuffers(windowATB);
+    glfwMakeContextCurrent(window);
     glfwSwapBuffers(window);
 
   }
 
   //Clean up
   glfwDestroyWindow(window);
+  glfwDestroyWindow(windowATB);
   glfwTerminate();
   exit(EXIT_SUCCESS);
 }
