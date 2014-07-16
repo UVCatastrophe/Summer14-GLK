@@ -48,10 +48,18 @@ GLfloat vert_data[] = {
 };
 
 /* Called when the window size is modified */
-void framebuffer_size_callback(GLFWwindow* window, int w, int h)
+void framebuffer_size_callback(GLFWwindow* win, int w, int h)
 {
+  GLFWwindow *current = glfwGetCurrentContext();
+
+  if(win != current)
+    glfwMakeContextCurrent(win);
   glViewport(0, 0, w, h); //Update the viewport
-  TwWindowSize(w,h); //Notify AntTweakBar of the Update
+  if(win == windowATB)
+    TwWindowSize(w,h); //Notify AntTweakBar of the Update
+
+  if(win != current)
+    glfwMakeContextCurrent(current);
 }
 
 /* Called when the mouse button is clicked*/
@@ -136,6 +144,7 @@ void init_TW(){
   glfwSetCursorPosCallback( windowATB , MousePosCB);
   glfwSetScrollCallback( windowATB , MouseScrollCB );
   glfwSetKeyCallback(windowATB , KeyFunCB);
+  glfwSetFramebufferSizeCallback(windowATB,framebuffer_size_callback);
 
   glfwMakeContextCurrent(window);
 }
