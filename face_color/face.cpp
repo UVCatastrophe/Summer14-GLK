@@ -7,8 +7,9 @@
 #include <stdio.h>
 #include <iostream>
 #include "shader.h"
-#include "SOIL/SOIL.h"
-//#include "CImg.h"
+#include <teem/air.h>
+#include <teem/biff.h>
+#include <teem/nrrd.h>
 
 #define POSITION_ATTRIB 0
 #define COLOR_ATTRIB 1
@@ -166,24 +167,66 @@ void init(void){
 
 
   //------Load the given image as a texture----------
-  glActiveTexture(GL_TEXTURE0);
+  //Use teem to load the image
+  Nrrd *nrdImg = nrrdNew();
 
-  GLuint tex = SOIL_load_OGL_texture(
-				     fileName.c_str(),
-				     SOIL_LOAD_AUTO,
-				     SOIL_CREATE_NEW_ID,
-				     SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
-				     );
-
-  if(tex == 0){
-    std::cout << "error loading texture" << std::endl;
-    exit(0);
+  if(nrrdLoad(nrdImg,fileName.c_str(),NULL)){
+    char* err = biffGetDone(NRRD);
+    fprintf(stderr, "trouble reading \"%s\":\n%s", 
+	    fileName.c_str(), err);
+    free(err);
+    exit(1);
   }
 
+  GLuint tex;
+  glGenTextures(1, &tex);
+
+  glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D,tex);
 
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  GLuint tex_mode;
+  GLuint tex_size = GL_UNSIGNED_BYTE;
+  int pic_width;
+  int pic_height;
+
+  if( nrdImg->dim == 2){
+    pic_width = nrdImg->axis[0].size;
+    pic_height = nrdImg->axis[1].size;
+
+    tex_mode = GL_RED;
+  }
+
+  else{
+    pic_width = nrdImg->axis[1].size;
+    pic_height = nrdImg->axis[2].size;
+
+    switch(nrdImg->axis[0].size){
+    case 3:
+      tex_mode = GL_RGB;
+      break;
+    case 4:
+      tex_mode = GL_RGBA;
+      break;
+    }
+
+  }
+
+  glTexImage2D(GL_TEXTURE_2D, 0, tex_mode, pic_width, 
+	       pic_height, 0, tex_mode, tex_size, 
+	       nrdImg->data);
+
+  int e;
+  if((e = glGetError()) != GL_NO_ERROR)
+    std::cout << e << std::endl;
+
+  nrrdNuke(nrdImg);
+
+  glBindTexture(GL_TEXTURE_2D,tex);
+  
+  glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, 
+		   GL_LINEAR );
+  glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 
+		   GL_LINEAR );
 
 
   //Activate shader Uniforms

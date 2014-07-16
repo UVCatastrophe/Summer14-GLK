@@ -10,4 +10,7 @@ void main(void) {
     dPos = vec3((orientMat*dPos).xy,0.0);
     gl_Position = vec4(dPos,1.0);
     tex_coord = (position.xy + 1.0) /2.0;
+    tex_coord.y = 1 - tex_coord.y;
+
+    
 }
