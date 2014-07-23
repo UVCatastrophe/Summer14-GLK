@@ -13,10 +13,16 @@ and 4 different values of beta in the superquadric shape (0, 1, 2, 4)
 
  */
 
+
+#define GLFW_INCLUDE_GLU
+#define GL_GLEXT_PROTOTYPES
+#include <GLFW/glfw3.h>
 #include <teem/air.h>
 #include <teem/biff.h>
 #include <teem/nrrd.h>
 #include <teem/limn.h>
+#include "shader.h"
+#include <glm/glm.hpp>
 
 char *pdInfo=("Program to demo limnPolyData (as well as the "
               "hest command-line option parser)");
@@ -107,6 +113,91 @@ main(int argc, const char **argv) {
       /* Can lpd now be rendered? */
 
     }
+  }
+
+  GLFWwindow *window = glfwCreateWindow(640,480, "Polydemo", NULL, NULL);
+  if(!window){
+    glfwTerminate();
+    exit(EXIT_FAILURE);
+  }
+
+  glfwMakeContextCurrent(window);
+
+  //Initialize the vao/vbo
+  GLuint vao;
+  // 0: Vertices
+  // 1: Normals
+  // 2: Colors
+  GLuint bufs[3];
+
+  glGenVertexArrays(1, &vao);
+  glGenBuffers(3,bufs);
+
+  glBindVertexArray(vao);
+  glEnableVertexAttribArray(0);
+  glEnableVertexAttribArray(1);
+  glEnableVertexAttribArray(2);
+
+  //Verts
+  glBindBuffer(GL_ARRAY_BUFFER, bufs[0]);
+  glBufferData(GL_ARRAY_BUFFER, lpd->xyzwNum*sizeof(float),
+	       lpd->xyzw, GL_STATIC_DRAW);
+  //Norms
+  glBindBuffer(GL_ARRAY_BUFFER, bufs[1]);
+  glBufferData(GL_ARRAY_BUFFER, lpd->normNum*sizeof(float),
+	       lpd->norm, GL_STATIC_DRAW);
+
+  //Colors
+  glBindBuffer(GL_ARRAY_BUFFER, bufs[2]);
+  glBufferData(GL_ARRAY_BUFFER, lpd->rgbaNum*sizeof(float),
+	       lpd->rgba, GL_STATIC_DRAW);
+
+
+  //Indices
+  GLuint elms;
+  glGenBuffers(1, &elms);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elms);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
+	       lpd->icnt * sizeof(int),
+	       lpd->indx, GL_STATIC_DRAW);
+
+  //Initialize the shaders
+  ShaderProgram *shader = new ShaderProgram(); 
+
+  const char* VSH_FILE = "shader.vsh";
+  const char* FSH_FILE = "shader.fsh";
+
+  //Set up the shader
+  shader->vertexShader(VSH_FILE);
+  shader->fragmentShader(FSH_FILE);
+
+  glBindAttribLocation(shader->progId,0, "position");
+  glBindAttribLocation(shader->progId,1, "norm");
+  glBindAttribLocation(shader->progId,2, "color");
+
+  glLinkProgram(shader->progId);
+  glUseProgram(shader->progId);
+
+  //Set up the view/projection matrix
+  glm::mat4 view = glm::lookAt(glm::vec3(1.0,0,1.0),
+			       glm::vec3(0.0,0.0,0.0),
+			       glm::vec3(0.0,1.0,0.0));
+
+  glm::mat4 proj = glm::perspective(45.0f, 640.0f/480.0f,.1f, 100f);
+
+  Gluint uniforms[2];
+  uniforms[0] = shader->UniformLocation("projMat");
+  uniforms[1] = shader->UnifromLocation("viewMat");
+
+  glUniformMatrix4fv(uniforms[0],1,false,proj);
+  glUniformMatrix4fv(uniforms[1],1,false,view);
+
+  //Now render the object
+  while(true){
+    glDrawElements( GL_TRIANGLE_STRIP, lpd->icnt, 
+		    GL_UNSIGNED_INT, 0);
+    glfwWaitEvents();
+    glfwSwapBuffers(window);
   }
 
   airMopOkay(mop);

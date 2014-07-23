@@ -180,7 +180,6 @@ void init(void){
   glLinkProgram(shader->progId);
   glUseProgram(shader->progId);
 
-
   //------Load the given image as a texture----------
   //Use teem to load the image
   Nrrd *nrdImg = nrrdNew();

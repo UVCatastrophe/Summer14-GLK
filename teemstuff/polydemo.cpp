@@ -28,10 +28,109 @@ and 4 different values of beta in the superquadric shape (0, 1, 2, 4)
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream> 
 
+/*Dimensions of the screen*/
+double height = 480;
+double width = 640;
 
-char *pdInfo=("Program to demo limnPolyData (as well as the "
-              "hest command-line option parser)");
+struct ui_pos{
+  bool isDown = false;
+  int mode; //0 for rotate, 1 for zoom
+  double last_x;
+  double last_y;
+} ui;
 
+struct camera{
+  glm::vec3 center = glm::vec3(0.0f,0.0f,0.0f);
+  glm::vec3 pos = glm::vec3(3.0f,0.0f,0.0f);
+  glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+} cam;
+
+glm::mat4 view = glm::lookAt(cam.pos,cam.center,cam.up);
+glm::mat4 proj = glm::perspective(1.0f, ((float) width)/((float)height),.1f, 100.0f);
+glm::mat4 model = glm::mat4();
+
+void mouseButtonCB(GLFWwindow* w, int button, 
+		   int action, int mods){
+  glfwGetCursorPos (w, &(ui.last_x), &(ui.last_y));
+
+  if(action == GLFW_PRESS){
+    ui.isDown = true;
+  }
+  else if(action == GLFW_RELEASE){
+    ui.isDown = false;
+  }
+
+  if(ui.last_x <= width*.1)
+    ui.mode = 1;
+  else
+    ui.mode = 0;
+}
+
+void mousePosCB(GLFWwindow* w, double x, double y){
+  if(!ui.isDown)
+    return;
+
+  if(ui.mode == 0){
+    float x_diff = ui.last_x - x;
+    float y_diff = ui.last_y - y;
+    glm::vec3 norm = glm::cross(cam.pos-cam.center, glm::vec3(0,y_diff,x_diff));
+    float angle = (glm::length(glm::vec2(x_diff,y_diff)) * 2*3.1415 ) / width;
+    
+    model = glm::rotate(glm::mat4(),angle,norm)* model;
+    
+    ui.last_x = x;
+    ui.last_y = y;
+  }
+  
+  else if(ui.mode == 1){
+    float y_diff = ui.last_y - y;
+    cam.pos += glm::normalize(cam.pos-cam.center) * y_diff*.001f;
+
+    view = glm::lookAt(cam.pos,cam.center,cam.up);
+
+    ui.last_x = x;
+    ui.last_y = y;
+  }
+
+}
+
+void screenSizeCB(GLFWwindow* win, int w, int h){
+  width = w;
+  height = h;
+
+  glViewport(0,0,width,height);
+
+  proj = glm::perspective(1.0f, ((float) width)/((float)height),.1f, 100.0f);
+
+}
+
+const char *pdInfo=("Program to demo limnPolyData (as well as the "
+"hest command-line option parser)");
+
+/* Converts a teem enum to an openGL enum */
+GLuint get_prim(unsigned char type){
+  switch(type){
+  case limnPrimitiveUnknown:
+    return 0;
+  case limnPrimitiveNoop:
+    return 0;
+  case limnPrimitiveTriangles:
+    return GL_TRIANGLES;
+  case limnPrimitiveTriangleStrip:
+    return GL_TRIANGLE_STRIP;
+  case limnPrimitiveTriangleFan:
+    return GL_TRIANGLE_FAN;
+  case limnPrimitiveQuads:
+    return GL_QUADS;
+  case limnPrimitiveLineStrip:
+    return GL_LINE_STRIP;
+  case limnPrimitiveLines:
+    return GL_LINES;
+  case limnPrimitiveLast:
+    return 0;
+  }
+
+}
 
 int main(int argc, const char **argv) {
   const char *me;
@@ -66,6 +165,7 @@ int main(int argc, const char **argv) {
   flag = ((1 << limnPolyDataInfoRGBA)
           | (1 << limnPolyDataInfoNorm));
 
+  //#if 0
   /* We're looping through these values not because its an especially
      important example, but it provides an example of changing
      polydata in a way that does *not* change the number and
@@ -80,12 +180,12 @@ int main(int argc, const char **argv) {
       /* this creates the polydata, re-using arrays where possible
          and allocating them when needed */
       if (limnPolyDataSpiralSuperquadric(lpd, flag,
-                                         0.5, parm[parmIdx], /* alpha, beta */
-                                         2*res[resIdx], res[resIdx])) {
-        airMopAdd(mop, err = biffGetDone(LIMN), airFree, airMopAlways);
-        fprintf(stderr, "%s: trouble making polydata:\n%s", me, err);
-        airMopError(mop);
-        return 1;
+					 0.5, parm[parmIdx], /* alpha, beta */
+					 2*res[resIdx], res[resIdx])) {
+	airMopAdd(mop, err = biffGetDone(LIMN), airFree, airMopAlways);
+	fprintf(stderr, "%s: trouble making polydata:\n%s", me, err);
+	airMopError(mop);
+	return 1;
       }
 
       /* this (textually) describes the polydata: lpd->xyzw, lpd->norm,
@@ -119,6 +219,9 @@ int main(int argc, const char **argv) {
 
     }
   }
+  //#endif
+
+  //limnPolyDataCube(lpd,flag,0);
 
   glfwInit();
 
@@ -147,19 +250,19 @@ int main(int argc, const char **argv) {
 
   //Verts
   glBindBuffer(GL_ARRAY_BUFFER, bufs[0]);
-  glBufferData(GL_ARRAY_BUFFER, lpd->xyzwNum*sizeof(float),
+  glBufferData(GL_ARRAY_BUFFER, lpd->xyzwNum*sizeof(float)*4,
 	       lpd->xyzw, GL_STATIC_DRAW);
   glVertexAttribPointer(0, 4, GL_FLOAT,GL_FALSE,0, 0);
 
   //Norms
   glBindBuffer(GL_ARRAY_BUFFER, bufs[1]);
-  glBufferData(GL_ARRAY_BUFFER, lpd->normNum*sizeof(float),
+  glBufferData(GL_ARRAY_BUFFER, lpd->normNum*sizeof(float)*3,
 	       lpd->norm, GL_STATIC_DRAW);
   glVertexAttribPointer(1, 3, GL_FLOAT,GL_FALSE,0, 0);
 
   //Colors
   glBindBuffer(GL_ARRAY_BUFFER, bufs[2]);
-  glBufferData(GL_ARRAY_BUFFER, lpd->rgbaNum*sizeof(char),
+  glBufferData(GL_ARRAY_BUFFER, lpd->rgbaNum*sizeof(char)*4,
 	       lpd->rgba, GL_STATIC_DRAW);
   glVertexAttribPointer(2, 4, GL_BYTE,GL_FALSE,0, 0);
 
@@ -170,7 +273,7 @@ int main(int argc, const char **argv) {
   glGenBuffers(1, &elms);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elms);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-	       lpd->indxNum * sizeof(int),
+	       lpd->indxNum * sizeof(unsigned int),
 	       lpd->indx, GL_STATIC_DRAW);
 
 
@@ -191,41 +294,59 @@ int main(int argc, const char **argv) {
   glLinkProgram(shader->progId);
   glUseProgram(shader->progId);
 
-  //Set up the view/projection matrix
-  glm::mat4 view = glm::lookAt(glm::vec3(5.0f,5.0f,5.0f),
-			       glm::vec3(0.0f,0.0f,0.0f),
-			       glm::vec3(0.0,1.0,0.0));
-
-  glm::mat4 proj = glm::perspective(.73f, 640.0f/480.0f,.1f, 50.0f);
   /*
-  for(int i = 0; i < lpd->xyzwNum; i += 4){
-    float x = lpd->xyzw[i];
-    float y = lpd->xyzw[i+1];
-    float z = lpd->xyzw[i+2];
-    float w = lpd->xyzw[i+3];
-    glm::vec4 v = glm::vec4(x,y,z,w);
-    v = (proj * view * v);
-    std::cout << v.x << " " << v.y << " "  << v.z << " " << v.w << " " <<  std::endl;
-  }*/
+  for(int i = 0; i < lpd->xyzwNum; i++){
+    float x = lpd->xyzw[0 + 4*i];
+    float y = lpd->xyzw[1 + 4*i];
+    float z = lpd->xyzw[2 + 4*i];
+    float w = lpd->xyzw[3 + 4*i];
+     glm::vec4 v = glm::vec4(x,y,z,w);
+     v = (proj * view * v);
+     v = v / v.w;
+     std::cout << i << ": " << v.x << " " << v.y << " "  << v.z << " " << v.w << " " <<  std::endl;
+     }
+  */
+  
+  /*
+  for(int i = 0; i < lpd->indxNum; i += 4){
+    std::cout << lpd->indx[i] << " " << lpd->indx[i+1] << " " << lpd->indx[i+2] << " " << lpd->indx[i+3] << std::endl;
+    }*/
 
-  GLuint uniforms[2];
+  GLuint uniforms[3];
   uniforms[0] = shader->UniformLocation("proj");
   uniforms[1] = shader->UniformLocation("view");
-
-  glUniformMatrix4fv(uniforms[0],1,false,glm::value_ptr(proj));
-  glUniformMatrix4fv(uniforms[1],1,false,glm::value_ptr(view));
-
+  uniforms[2] = shader->UniformLocation("model");
 
   glBindVertexArray(vao);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elms);
 
   //Now render the object
-  while(true){
+  glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 
-    glDrawElements( GL_TRIANGLE_STRIP, lpd->indxNum, 
-		    GL_UNSIGNED_INT, (GLvoid*)0);
-    if(glGetError() != GL_NO_ERROR)
-      std::cout << "fail\n";
+  glfwSetCursorPosCallback(window, mousePosCB);
+  glfwSetMouseButtonCallback(window,mouseButtonCB);
+  glfwSetWindowSizeCallback(window,screenSizeCB);
+
+  glDisable(GL_CULL_FACE);
+
+  while(true){
+    glUniformMatrix4fv(uniforms[0],1,false,glm::value_ptr(proj));
+    glUniformMatrix4fv(uniforms[1],1,false,glm::value_ptr(view));
+    glUniformMatrix4fv(uniforms[2],1,false,glm::value_ptr(model));
+
+    glClear(GL_COLOR_BUFFER_BIT);
+    int offset = 0;
+    for(int i = 0; i < lpd->primNum; i++){
+      GLuint prim = get_prim(lpd->type[i]);
+
+      glDrawElements( prim, lpd->icnt[i], 
+		      GL_UNSIGNED_INT, ((void*) 0) + offset);
+      offset += lpd->icnt[i];
+      GLuint error;
+      if( (error = glGetError()) != GL_NO_ERROR)
+	std::cout << "GLERROR: " << error << std::endl;
+    }
+    glfwWaitEvents();
     glfwSwapBuffers(window);
 
   }
