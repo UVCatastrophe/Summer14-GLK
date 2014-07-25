@@ -144,6 +144,31 @@ bool parse_args(int num, char** args){
 
 }
 
+GLuint nrrd_get_type(int type){
+  switch(type){
+  case nrrdTypeChar:
+    return GL_BYTE;
+  case nrrdTypeUChar:
+    return GL_UNSIGNED_BYTE;
+  case nrrdTypeShort:
+    return GL_SHORT;
+  case nrrdTypeUShort:
+    return GL_UNSIGNED_SHORT;
+  case nrrdTypeInt:
+    return GL_INT;
+  case nrrdTypeUInt:
+    return GL_UNSIGNED_INT;
+  case nrrdTypeFloat:
+    return GL_FLOAT;
+  case nrrdTypeDouble:
+    return GL_DOUBLE;
+  default:
+    return 0;
+
+  }
+
+}
+
 static void error_callback(int error, const char* description){
   fputs(description, stderr);
 }
@@ -213,26 +238,31 @@ void take_screenshot(void* clientData){
 	       GL_UNSIGNED_BYTE,ss);
 
   //Used to save the rendered image
+  Nrrd *nflip = nrrdNew();
   Nrrd *nout = nrrdNew();
 
   char* err;
     //Saves the contents of the buffer as a png image
     //Currently upsidedown
-if (nrrdWrap_va(nout, ss, nrrdTypeUChar, 3,
+
+if (nrrdWrap_va(nflip, ss, nrrdTypeUChar, 3,
 		(size_t)3, (size_t)pic_width, (size_t)pic_height)
-    || nrrdSave((fileOut + std::string(".png")).c_str(), nout, NULL)) {
+    || nrrdFlip(nout,nflip, 2) ||  nrrdSave((fileOut + std::string(".png")).c_str(), nout, NULL)) {
       err = biffGetDone(NRRD);
       fprintf(stderr, "trouble wrapping image:\n%s", err);
       free(err);
       return;
     }
-    nrrdNuke(nout);
 
-  //Reset the transformation matrix
-  init_matrix();
+ nrrdNuke(nout);
+ nrrdNuke(nflip);
+
+
+ //Reset the transformation matrix
+ init_matrix();
 
   //rebind the frambuffer to the screen
-  glBindFramebuffer (GL_FRAMEBUFFER, 0);
+ glBindFramebuffer (GL_FRAMEBUFFER, 0);
 }
 
 /* Called when MvUP button is press for a given control-point 
@@ -429,7 +459,7 @@ GLuint init_texture(){
   glBindTexture(GL_TEXTURE_2D,tex);
 
   GLuint tex_mode;
-  GLuint tex_size = GL_UNSIGNED_BYTE;
+  GLuint tex_size = nrrd_get_type(nrdImg->type);
 
   if( nrdImg->dim == 2){
     pic_width = nrdImg->axis[0].size;
