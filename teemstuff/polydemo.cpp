@@ -71,17 +71,20 @@ void mouseButtonCB(GLFWwindow* w, int button,
 		   int action, int mods){
 
 
-  int pos[2];
-  int tw_size[2];
-  TwGetParam(bar, NULL, "position", TW_PARAM_INT32, 2, pos);
-  TwGetParam(bar,NULL, "size", TW_PARAM_INT32, 2, tw_size);
+
   //On the tweakbar
   glfwGetCursorPos (w, &(ui.last_x), &(ui.last_y));
 
-  if(pos[0] <= ui.last_x && pos[0] + tw_size[0] >= ui.last_x && 
-     pos[1] <= ui.last_y && pos[1] + tw_size[1] >= ui.last_y){
+  if(ui.isDown == false){
     TwEventMouseButtonGLFW( button , action );
-    return;
+    
+    int pos[2];
+    int tw_size[2];
+    TwGetParam(bar, NULL, "position", TW_PARAM_INT32, 2, pos);
+    TwGetParam(bar,NULL, "size", TW_PARAM_INT32, 2, tw_size);
+    if(pos[0] <= ui.last_x && pos[0] + tw_size[0] >= ui.last_x && 
+       pos[1] <= ui.last_y && pos[1] + tw_size[1] >= ui.last_y)
+      return;
   }
 
   if(action == GLFW_PRESS){
