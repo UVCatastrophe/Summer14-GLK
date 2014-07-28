@@ -14,6 +14,6 @@ void main(void) {
 
     gl_Position = proj * view * model * position;
     norm_frag = vec3(model * vec4(norm,0.0));
-    color_frag = color/255.0;
+    color_frag = color/(255.0);
     
 }
