@@ -40,6 +40,7 @@ unsigned int lpd_phi = 20;
 unsigned int old_indxNum;
 
 limnPolyData *poly;
+TwBar *bar;
 
 struct render_info{
   GLuint vao = -1;
@@ -68,9 +69,20 @@ glm::mat4 model = glm::mat4();
 
 void mouseButtonCB(GLFWwindow* w, int button, 
 		   int action, int mods){
-  TwEventMouseButtonGLFW( button , action );
 
+
+  int pos[2];
+  int tw_size[2];
+  TwGetParam(bar, NULL, "position", TW_PARAM_INT32, 2, pos);
+  TwGetParam(bar,NULL, "size", TW_PARAM_INT32, 2, tw_size);
+  //On the tweakbar
   glfwGetCursorPos (w, &(ui.last_x), &(ui.last_y));
+
+  if(pos[0] <= ui.last_x && pos[0] + tw_size[0] >= ui.last_x && 
+     pos[1] <= ui.last_y && pos[1] + tw_size[1] >= ui.last_y){
+    TwEventMouseButtonGLFW( button , action );
+    return;
+  }
 
   if(action == GLFW_PRESS){
     ui.isDown = true;
@@ -86,10 +98,10 @@ void mouseButtonCB(GLFWwindow* w, int button,
 }
 
 void mousePosCB(GLFWwindow* w, double x, double y){
-  TwEventMousePosGLFW( (int)x, (int)y );
-
-  if(!ui.isDown)
+  if(!ui.isDown){
+    TwEventMousePosGLFW( (int)x, (int)y );
     return;
+  }
 
   if(ui.mode == 0){
     float x_diff = ui.last_x - x;
@@ -300,7 +312,7 @@ void init_ATB(){
 
   TwWindowSize(width,height);
 
-  TwBar *bar = TwNewBar("lpdTweak");
+  bar = TwNewBar("lpdTweak");
 
   TwDefine(" lpdTweak size='200 200' ");
   TwDefine(" lpdTweak resizable=true ");
