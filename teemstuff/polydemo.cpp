@@ -39,19 +39,15 @@ double width = 640;
 /*The parameters for call to generate_spiral. Modified by ATB*/
 float lpd_alpha = .5;
 float lpd_beta = 0;
-unsigned int lpd_theta = 10;
-unsigned int lpd_phi = 20;
-
-/*Used to detect which of the above parameters have been changed*/
-float old_alpha = lpd_alpha;
-float old_beta = lpd_beta;
-unsigned int old_theta = lpd_theta;
-unsigned int old_phi = lpd_phi;
+float lpd_theta = 10;
+float lpd_phi = 20;
 
 //Poly data for the spiral
 limnPolyData *poly;
 //The ATB pannel
 TwBar *bar;
+
+#define USE_TIME false
 
 struct render_info{
   GLuint vao = -1;
@@ -77,6 +73,62 @@ struct camera{
 glm::mat4 view = glm::lookAt(cam.pos,cam.center,cam.up);
 glm::mat4 proj = glm::perspective(1.0f, ((float) width)/((float)height),.1f, 100.0f);
 glm::mat4 model = glm::mat4();
+
+/* -------- Prototypes -------------------------*/
+void buffer_data(limnPolyData *lpd, bool buffer_new);
+limnPolyData *generate_spiral(float A, float B,unsigned int thetaRes,
+			      unsigned int phiRes);
+
+
+/*---------------------Function Defentions----------------*/
+
+void TWCB_Set(const void *value, void *clientData){
+#if USE_TIME
+  double genStart;
+  double buffStart;
+  double buffTime;
+  double genTime;
+#endif
+
+  *(float*)clientData = *(float*)value;
+
+#if USE_TIME
+    genStart = airTime();
+#endif
+  limnPolyData *lpd = generate_spiral(lpd_alpha,lpd_beta,
+				      lpd_theta,lpd_phi);
+#if USE_TIME
+     genTime = airTime();
+     buffStart = airTime();
+#endif
+
+  buffer_data(lpd,true);
+
+#if USE_TIME
+    buffTime = airTime();
+#endif
+
+#if USE_TIME
+    std::cout << "With Reallocation" << std::endl;
+    std::cout << "Generation Time is: " << genTime-genStart << std::endl;
+    std::cout << "Buffering Time is: " << buffTime-buffStart << std::endl;
+
+    if(clientData == &lpd_beta){
+      std::cout << "Without Reallocation: ";
+      buffStart = airTime();
+      buffer_data(lpd,false); 
+      buffTime = airTime();
+      std::cout << buffTime-buffStart << std::endl;
+    }
+#endif
+
+  limnPolyDataNix(poly);
+  poly = lpd;
+}
+
+void TWCB_Get(void *value, void *clientData){
+  *(float *)value = *(float*)clientData;
+}
 
 void mouseButtonCB(GLFWwindow* w, int button, 
 		   int action, int mods){
@@ -267,11 +319,13 @@ void render_poly(){
   
 }
 
+
+
 /* Buffer the data stored in the global limPolyData Poly.
  * Buffer_new is set to true if the number or connectiviity of the vertices
  * has changed since the last buffering.
  */
-void buffer_data(bool buffer_new){
+void buffer_data(limnPolyData *lpd, bool buffer_new){
 
   //First Pass
   if(render.vao == -1){
@@ -288,31 +342,31 @@ void buffer_data(bool buffer_new){
   //Verts
   glBindBuffer(GL_ARRAY_BUFFER, render.buffs[0]);
   if(buffer_new)
-    glBufferData(GL_ARRAY_BUFFER, poly->xyzwNum*sizeof(float)*4,
-		 poly->xyzw, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, lpd->xyzwNum*sizeof(float)*4,
+		 lpd->xyzw, GL_DYNAMIC_DRAW);
   else//No change in number of vertices
     glBufferSubData(GL_ARRAY_BUFFER, 0,  
-		    poly->xyzwNum*sizeof(float)*4,poly->xyzw);
+		    lpd->xyzwNum*sizeof(float)*4,lpd->xyzw);
   glVertexAttribPointer(0, 4, GL_FLOAT,GL_FALSE,0, 0);
 
   //Norms
   glBindBuffer(GL_ARRAY_BUFFER, render.buffs[1]);
   if(buffer_new)
-    glBufferData(GL_ARRAY_BUFFER, poly->normNum*sizeof(float)*3,
-		 poly->norm, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, lpd->normNum*sizeof(float)*3,
+		 lpd->norm, GL_DYNAMIC_DRAW);
   else
     glBufferSubData(GL_ARRAY_BUFFER, 0,
-		    poly->normNum*sizeof(float)*3,poly->norm);
+		    lpd->normNum*sizeof(float)*3,lpd->norm);
   glVertexAttribPointer(1, 3, GL_FLOAT,GL_FALSE,0, 0);
 
   //Colors
   glBindBuffer(GL_ARRAY_BUFFER, render.buffs[2]);
   if(buffer_new)
-    glBufferData(GL_ARRAY_BUFFER, poly->rgbaNum*sizeof(char)*4,
-		 poly->rgba, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, lpd->rgbaNum*sizeof(char)*4,
+		 lpd->rgba, GL_DYNAMIC_DRAW);
   else
     glBufferSubData(GL_ARRAY_BUFFER, 0, 
-		    poly->rgbaNum*sizeof(char)*4,poly->rgba);
+		    lpd->rgbaNum*sizeof(char)*4,lpd->rgba);
   glVertexAttribPointer(2, 4, GL_BYTE,GL_FALSE,0, 0);
 
   if(buffer_new){
@@ -320,8 +374,8 @@ void buffer_data(bool buffer_new){
     glGenBuffers(1, &(render.elms));
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, render.elms);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-		 poly->indxNum * sizeof(unsigned int),
-		 poly->indx, GL_DYNAMIC_DRAW);
+		 lpd->indxNum * sizeof(unsigned int),
+		 lpd->indx, GL_DYNAMIC_DRAW);
   }
 }
 
@@ -349,27 +403,6 @@ void enable_shaders(const char* vshFile, const char* fshFile){
   
 }
 
-/* Called when the 'Update' button is pressed on the tweakbar pannel.
- * Generates a new spiral and buffers the data for the next draw command.
- */
-void TWCB_Update(void* clientData){
-
-  limnPolyDataNix(poly);
-  poly = generate_spiral(lpd_alpha,lpd_beta,lpd_theta,lpd_phi);
-
-  //See if its only Beta that has changed
-  bool genNew = (lpd_theta != old_theta) || (lpd_phi != old_phi) || 
-    (lpd_alpha != old_alpha);
-
-  buffer_data(genNew);
-
-  old_alpha = lpd_alpha;
-  old_beta = lpd_beta;
-  old_theta = lpd_theta;
-  old_phi = lpd_phi;
-
-}
-
 //Initialize the ATB pannel.
 void init_ATB(){
   TwInit(TW_OPENGL, NULL);
@@ -390,17 +423,17 @@ void init_ATB(){
     std::to_string((int)(width - ATB_WIDTH)) + std::string(" 0'");
   TwDefine(s.c_str());
 
-  TwAddVarRW(bar, "ALPHA", TW_TYPE_FLOAT, &lpd_alpha, 
-	     "step=.01 label=Alpha");
+  TwAddVarCB(bar, "ALPHA", TW_TYPE_FLOAT, TWCB_Set, TWCB_Get, 
+	     &lpd_alpha, "min=0.0 step=.01 label=Alpha");
 
-  TwAddVarRW(bar, "BETA", TW_TYPE_FLOAT, &lpd_beta,
-	     "step=.01 label=Beta");
+  TwAddVarCB(bar, "BETA", TW_TYPE_FLOAT, TWCB_Set, TWCB_Get, 
+	     &lpd_beta, "min=0.0 step=.01 label=Beta");
 
-  TwAddVarRW(bar, "THETA_RES", TW_TYPE_UINT32, &lpd_theta, "label='Theta Resolution'");
+  TwAddVarCB(bar, "THETA", TW_TYPE_FLOAT, TWCB_Set, TWCB_Get, 
+	     &lpd_theta, "min=1.0 step=1 label=Theta");
 
-  TwAddVarRW(bar, "PHI_RES", TW_TYPE_UINT32, &lpd_phi, "label='Phi Resolution'");
-
-  TwAddButton(bar, "UPDATE",  TWCB_Update, NULL, "label=update");
+  TwAddVarCB(bar, "PHI", TW_TYPE_FLOAT, TWCB_Set, TWCB_Get, 
+	     &lpd_phi, "min=1.0 step=1 label=Phi");
 
 }
 
@@ -422,7 +455,7 @@ int main(int argc, const char **argv) {
   enable_shaders("shader.vsh","shader.fsh");
 
   poly = generate_spiral(lpd_alpha,lpd_beta, lpd_theta, lpd_phi);
-  buffer_data(true);
+  buffer_data(poly,true);
 
   glBindVertexArray(render.vao);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, render.elms);
