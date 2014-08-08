@@ -79,10 +79,13 @@ struct camera{
   bool fixUp = false;
 } cam;
 
+//Transformation Matricies
 glm::mat4 view = glm::lookAt(cam.pos,cam.center,cam.up);
 glm::mat4 proj = glm::perspective(cam.fov, ((float) width)/((float)height),
 				  cam.near_plane, cam.far_plane);
 glm::mat4 model = glm::mat4();
+
+glm::vec3 light_dir = glm::vec3(1.0f,0.0f,0.0f);
 
 /* -------- Prototypes -------------------------*/
 void buffer_data(limnPolyData *lpd, bool buffer_new);
@@ -422,6 +425,9 @@ void render_poly(){
   glUniformMatrix4fv(render.uniforms[0],1,false,glm::value_ptr(proj));
   glUniformMatrix4fv(render.uniforms[1],1,false,glm::value_ptr(view));
   glUniformMatrix4fv(render.uniforms[2],1,false,glm::value_ptr(model));
+
+  //Light Direction Uniforms
+  glUniform3fv(render.uniforms[3],1,glm::value_ptr(light_dir));
   
   glClear(GL_DEPTH_BUFFER_BIT);
   glClear(GL_COLOR_BUFFER_BIT);
@@ -521,6 +527,7 @@ void enable_shaders(const char* vshFile, const char* fshFile){
   render.uniforms[0] = render.shader->UniformLocation("proj");
   render.uniforms[1] = render.shader->UniformLocation("view");
   render.uniforms[2] = render.shader->UniformLocation("model");
+  render.uniforms[3] = render.shader->UniformLocation("light_dir");
   
 }
 
@@ -567,6 +574,9 @@ void init_ATB(){
 
   TwAddVarCB(bar, "CamUp", TW_TYPE_DIR3F, TWCB_Cam_Set, TWCB_Cam_Get, 
 	     glm::value_ptr(cam.up),"label='Up Vector' group='Camera'");
+
+  TwAddVarRW(bar, "LightDir", TW_TYPE_DIR3F, 
+	     glm::value_ptr(light_dir), "label='Light Direction'");
 
 }
 
