@@ -8,9 +8,10 @@ out vec4 fcol;
 
 void main(void) {
 /* bp-shading model */
+  vec4 light_color = vec4(1.0,1.0,1.0,1.0);
 
-  float a = max(0,dot( normalize(light_dir),normalize(norm_frag)) );
-  fcol = color_frag * min(1.5,(1 + a));
+  float a = max(0,dot( normalize(light_dir),normalize(norm_frag)));
+  fcol = color_frag + (light_color * a);
   fcol.a = color_frag.a;
 
 }

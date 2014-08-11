@@ -8,6 +8,7 @@
 #include <teem/biff.h>
 #include <teem/nrrd.h>
 #include <teem/limn.h>
+#include <teem/seek.h>
 #include "shader.h"
 #include <glm/glm.hpp>
 #include "glm/gtc/matrix_transform.hpp"
@@ -22,13 +23,11 @@
 double height = 480;
 double width = 640;
 
-/*The parameters for call to generate_spiral. Modified by ATB*/
-float lpd_alpha = .5;
-float lpd_beta = 0;
-float lpd_theta = 10;
-float lpd_phi = 20;
-
-//Poly data for the spiral
+//The seek data
+Nrrd* seek_data;
+//The seek context
+seekContext *sctx;
+//Poly data for the sample
 limnPolyData *poly;
 //The ATB pannel
 TwBar *bar;
@@ -75,8 +74,7 @@ glm::vec3 light_dir = glm::vec3(1.0f,0.0f,0.0f);
 
 /* -------- Prototypes -------------------------*/
 void buffer_data(limnPolyData *lpd, bool buffer_new);
-limnPolyData *generate_spiral(float A, float B,unsigned int thetaRes,
-			      unsigned int phiRes);
+limnPolyData *generate_sample(float index);
 
 
 /*---------------------Function Defentions----------------*/
@@ -90,6 +88,7 @@ void update_proj(){
 			  cam.near_plane, cam.far_plane);
 }
 
+#if 0
 void TWCB_Cam_Set(const void *value, void *clientData){
   float* val_vec = (float*)value;
   float* cd_vec = (float*)clientData;
@@ -160,6 +159,7 @@ void TWCB_Spiral_Set(const void *value, void *clientData){
 void TWCB_Spiral_Get(void *value, void *clientData){
   *(float *)value = *(float*)clientData;
 }
+#endif
 
 void mouseButtonCB(GLFWwindow* w, int button, 
 		   int action, int mods){
@@ -169,7 +169,7 @@ void mouseButtonCB(GLFWwindow* w, int button,
   ui.mouseButton = button;
 
   //User is not currently rotating or zooming.
-  if(ui.isDown == false){
+  /*if(ui.isDown == false){
     //Pass the event to ATB
     TwEventMouseButtonGLFW( button , action );
     
@@ -182,7 +182,7 @@ void mouseButtonCB(GLFWwindow* w, int button,
     if(pos[0] <= ui.last_x && pos[0] + tw_size[0] >= ui.last_x && 
        pos[1] <= ui.last_y && pos[1] + tw_size[1] >= ui.last_y)
       return;
-  }
+      }*/
 
   //Else, set up the mode for rotating/zooming
   if(action == GLFW_PRESS){
@@ -236,7 +236,7 @@ void translate_diff(glm::vec3 diff){
 void mousePosCB(GLFWwindow* w, double x, double y){
   //If zooming/rotating is not occuring, just pass to ATB
   if(!ui.isDown){
-    TwEventMousePosGLFW( (int)x, (int)y );
+  //TwEventMousePosGLFW( (int)x, (int)y );
     return;
   }
 
@@ -267,7 +267,6 @@ void mousePosCB(GLFWwindow* w, double x, double y){
       update_proj();
     }
     else if(ui.mouseButton == GLFW_MOUSE_BUTTON_2)
-      std::cout << "here\n";
       translate_diff(glm::vec3(0.0f,0.0f,y_diff));
 
   }
@@ -360,46 +359,53 @@ GLuint get_prim(unsigned char type){
 
 }
 
+void init_seek(){
+  sctx = seekContextNew();
+  seekVerboseSet(sctx, 0);
+  seekNormalsFindSet(sctx, AIR_TRUE);
+
+  if (seekDataSet(sctx, seek_data, NULL, 0)
+      || seekTypeSet(sctx, seekTypeIsocontour)) {
+    char* err = biffGetDone(SEEK);
+    fprintf(stderr, "trouble with set-up:\n%s", err);
+    free(err);
+  }
+
+}
+
+void parse_args(int argc,const char**argv){
+  const char *me;
+  hestOpt *hopt;
+  hestParm *hparm;
+  airArray *mop;
+
+  me = argv[0];
+  mop = airMopNew();
+  hparm = hestParmNew();
+  hopt = NULL;
+  airMopAdd(mop, hparm, (airMopper)hestParmFree, airMopAlways);
+  hestOptAdd(&hopt, "i", "nin", airTypeOther, 1, 1, &seek_data, 
+	     NULL,"volume from which to extract isosurfaces", NULL,
+	     NULL,nrrdHestNrrd);
+  hestParseOrDie(hopt, argc-1, argv+1, hparm,
+                 me,NULL, AIR_TRUE, AIR_TRUE, AIR_TRUE);
+  airMopAdd(mop, hopt, (airMopper)hestOptFree, airMopAlways);
+  airMopAdd(mop, hopt, (airMopper)hestParseFree, airMopAlways);
+
+}
+
 /*Generates a spiral using limnPolyDataSpiralSuperquadratic and returns
 * a pointer to the newly created object.
 */
-limnPolyData *generate_spiral(float A, float B,unsigned int thetaRes,
-			      unsigned int phiRes){
-  airArray *mop;
+limnPolyData *generate_sample(float index){
 
-  char *err;
-  unsigned int *res, resNum, resIdx, parmNum, parmIdx, flag;
-  float *parm;
-  limnPolyData *lpd;
-
-  lpd = limnPolyDataNew();
-  /* this controls which arrays of per-vertex info will be allocated
-     inside the limnPolyData */
-  flag = ((1 << limnPolyDataInfoRGBA)
-          | (1 << limnPolyDataInfoNorm));
-
-  /* this creates the polydata, re-using arrays where possible
-     and allocating them when needed */
-  if (limnPolyDataSpiralSuperquadric(lpd, flag,
-				     A, B, /* alpha, beta */
-				     thetaRes, phiRes)) {
-    airMopAdd(mop, err = biffGetDone(LIMN), airFree, airMopAlways);
-    fprintf(stderr, "trouble making polydata:\n%s", err);
-    airMopError(mop);
-    return NULL;
-  }
-
-  /* do something with per-vertex data to make it visually more interesting:
-     the R,G,B colors increase with X, Y, and Z, respectively */
-  unsigned int vertIdx;
-  for (vertIdx=0; vertIdx<lpd->xyzwNum; vertIdx++) {
-    float *xyzw = lpd->xyzw + 4*vertIdx;
-    unsigned char *rgba = lpd->rgba + 4*vertIdx;
-    rgba[0] = AIR_CAST(unsigned char, AIR_AFFINE(-1, xyzw[0], 1, 40, 255));
-    rgba[1] = AIR_CAST(unsigned char, AIR_AFFINE(-1, xyzw[1], 1, 40, 255));
-    rgba[2] = AIR_CAST(unsigned char, AIR_AFFINE(-1, xyzw[2], 1, 40, 255));
-
-    rgba[3] = 255;
+  limnPolyData* lpd = limnPolyDataNew();
+  if (seekIsovalueSet(sctx, index)
+      || seekUpdate(sctx)
+      || seekExtract(sctx, lpd)) {
+    char* err = biffGetDone(SEEK);
+    fprintf(stderr, "trouble getting isovalue:\n%s", err);
+    free(err);
   }
   
   return lpd;
@@ -441,6 +447,7 @@ void render_poly(){
 void buffer_data(limnPolyData *lpd, bool buffer_new){
 
   //First Pass
+
   if(render.vao == -1){
 
     glGenVertexArrays(1, &(render.vao));
@@ -463,24 +470,31 @@ void buffer_data(limnPolyData *lpd, bool buffer_new){
   glVertexAttribPointer(0, 4, GL_FLOAT,GL_FALSE,0, 0);
 
   //Norms
-  glBindBuffer(GL_ARRAY_BUFFER, render.buffs[1]);
-  if(buffer_new)
-    glBufferData(GL_ARRAY_BUFFER, lpd->normNum*sizeof(float)*3,
-		 lpd->norm, GL_DYNAMIC_DRAW);
-  else
-    glBufferSubData(GL_ARRAY_BUFFER, 0,
-		    lpd->normNum*sizeof(float)*3,lpd->norm);
-  glVertexAttribPointer(1, 3, GL_FLOAT,GL_FALSE,0, 0);
+
+  if(lpd->norm != NULL){
+    std::cout << "has norms\n";
+    glBindBuffer(GL_ARRAY_BUFFER, render.buffs[1]);
+    if(buffer_new)
+      glBufferData(GL_ARRAY_BUFFER, lpd->normNum*sizeof(float)*3,
+		   lpd->norm, GL_DYNAMIC_DRAW);
+    else
+      glBufferSubData(GL_ARRAY_BUFFER, 0,
+		      lpd->normNum*sizeof(float)*3,lpd->norm);
+    glVertexAttribPointer(1, 3, GL_FLOAT,GL_FALSE,0, 0);
+  }
 
   //Colors
-  glBindBuffer(GL_ARRAY_BUFFER, render.buffs[2]);
-  if(buffer_new)
-    glBufferData(GL_ARRAY_BUFFER, lpd->rgbaNum*sizeof(char)*4,
-		 lpd->rgba, GL_DYNAMIC_DRAW);
-  else
-    glBufferSubData(GL_ARRAY_BUFFER, 0, 
-		    lpd->rgbaNum*sizeof(char)*4,lpd->rgba);
-  glVertexAttribPointer(2, 4, GL_BYTE,GL_FALSE,0, 0);
+  if(lpd->rgba != NULL){
+    std::cout << "has colors\n";
+    glBindBuffer(GL_ARRAY_BUFFER, render.buffs[2]);
+    if(buffer_new)
+      glBufferData(GL_ARRAY_BUFFER, lpd->rgbaNum*sizeof(char)*4,
+		   lpd->rgba, GL_DYNAMIC_DRAW);
+    else
+      glBufferSubData(GL_ARRAY_BUFFER, 0, 
+		      lpd->rgbaNum*sizeof(char)*4,lpd->rgba);
+    glVertexAttribPointer(2, 4, GL_BYTE,GL_FALSE,0, 0);
+  }
 
   if(buffer_new){
     //Indices
@@ -517,6 +531,7 @@ void enable_shaders(const char* vshFile, const char* fshFile){
   
 }
 
+#if 0
 //Initialize the ATB pannel.
 void init_ATB(){
   TwInit(TW_OPENGL, NULL);
@@ -565,10 +580,11 @@ void init_ATB(){
 	     glm::value_ptr(light_dir), "label='Light Direction'");
 
 }
+#endif
 
 
 int main(int argc, const char **argv) {
-  
+
   glfwInit();
 
   GLFWwindow *window = glfwCreateWindow(640,480, "Sample", NULL, NULL);
@@ -579,11 +595,14 @@ int main(int argc, const char **argv) {
 
   glfwMakeContextCurrent(window);
   
-  init_ATB();
+  //init_ATB()
+
+  parse_args(argc,argv);
+  init_seek();
 
   enable_shaders("shader.vsh","shader.fsh");
 
-  poly = generate_spiral(lpd_alpha,lpd_beta, lpd_theta, lpd_phi);
+  poly = generate_sample(0.5f);
   buffer_data(poly,true);
 
   glBindVertexArray(render.vao);
@@ -603,7 +622,7 @@ int main(int argc, const char **argv) {
   while(true){
     render_poly();
 
-    TwDraw();
+    //TwDraw();
     glfwWaitEvents();
     glfwSwapBuffers(window);
 
