@@ -23,6 +23,9 @@
 double height = 480;
 double width = 640;
 
+
+//The Current Isovalue
+float isovalue = 0.5;
 //The seek data
 Nrrd* seek_data;
 //The seek context
@@ -88,7 +91,6 @@ void update_proj(){
 			  cam.near_plane, cam.far_plane);
 }
 
-#if 0
 void TWCB_Cam_Set(const void *value, void *clientData){
   float* val_vec = (float*)value;
   float* cd_vec = (float*)clientData;
@@ -110,56 +112,22 @@ void TWCB_Cam_Get(void *value, void *clientData){
 
 }
 
-void TWCB_Spiral_Set(const void *value, void *clientData){
-#if USE_TIME
-  double genStart;
-  double buffStart;
-  double buffTime;
-  double genTime;
-#endif
+void TWCB_Isovalue_Set(const void *value, void *clientData){
 
   *(float*)clientData = *(float*)value;
-
-#if USE_TIME
-    genStart = airTime();
-#endif
-
-  limnPolyData *lpd = generate_spiral(lpd_alpha,lpd_beta,
-				      lpd_theta,lpd_phi);
-
-#if USE_TIME
-     genTime = airTime();
-     buffStart = airTime();
-#endif
-
+  
+  limnPolyData *lpd = generate_sample(isovalue);
   buffer_data(lpd,true);
 
-#if USE_TIME
-    buffTime = airTime();
-#endif
-
-#if USE_TIME
-    std::cout << "With Reallocation" << std::endl;
-    std::cout << "Generation Time is: " << genTime-genStart << std::endl;
-    std::cout << "Buffering Time is: " << buffTime-buffStart << std::endl;
-
-    if(clientData == &lpd_beta){
-      std::cout << "Without Reallocation: ";
-      buffStart = airTime();
-      buffer_data(lpd,false); 
-      buffTime = airTime();
-      std::cout << buffTime-buffStart << std::endl;
-    }
-#endif
-
-  limnPolyDataNix(poly);
+  free(poly);
   poly = lpd;
+
 }
 
-void TWCB_Spiral_Get(void *value, void *clientData){
+void TWCB_Isovalue_Get(void *value, void *clientData){
   *(float *)value = *(float*)clientData;
 }
-#endif
+
 
 void mouseButtonCB(GLFWwindow* w, int button, 
 		   int action, int mods){
@@ -169,7 +137,7 @@ void mouseButtonCB(GLFWwindow* w, int button,
   ui.mouseButton = button;
 
   //User is not currently rotating or zooming.
-  /*if(ui.isDown == false){
+  if(ui.isDown == false){
     //Pass the event to ATB
     TwEventMouseButtonGLFW( button , action );
     
@@ -182,7 +150,7 @@ void mouseButtonCB(GLFWwindow* w, int button,
     if(pos[0] <= ui.last_x && pos[0] + tw_size[0] >= ui.last_x && 
        pos[1] <= ui.last_y && pos[1] + tw_size[1] >= ui.last_y)
       return;
-      }*/
+      }
 
   //Else, set up the mode for rotating/zooming
   if(action == GLFW_PRESS){
@@ -236,7 +204,7 @@ void translate_diff(glm::vec3 diff){
 void mousePosCB(GLFWwindow* w, double x, double y){
   //If zooming/rotating is not occuring, just pass to ATB
   if(!ui.isDown){
-  //TwEventMousePosGLFW( (int)x, (int)y );
+    TwEventMousePosGLFW( (int)x, (int)y );
     return;
   }
 
@@ -472,7 +440,6 @@ void buffer_data(limnPolyData *lpd, bool buffer_new){
   //Norms
 
   if(lpd->norm != NULL){
-    std::cout << "has norms\n";
     glBindBuffer(GL_ARRAY_BUFFER, render.buffs[1]);
     if(buffer_new)
       glBufferData(GL_ARRAY_BUFFER, lpd->normNum*sizeof(float)*3,
@@ -531,7 +498,6 @@ void enable_shaders(const char* vshFile, const char* fshFile){
   
 }
 
-#if 0
 //Initialize the ATB pannel.
 void init_ATB(){
   TwInit(TW_OPENGL, NULL);
@@ -547,22 +513,14 @@ void init_ATB(){
 
   TwDefine(" lpdTweak resizable=true ");
 
-  //position=top left corner
+  //position=top-right corner
   s = std::string("lpdTweak position='") + 
     std::to_string((int)(width - ATB_WIDTH)) + std::string(" 0'");
   TwDefine(s.c_str());
 
-  TwAddVarCB(bar, "ALPHA", TW_TYPE_FLOAT, TWCB_Spiral_Set, TWCB_Spiral_Get, 
-	     &lpd_alpha, "min=0.0 step=.01 label=Alpha");
-
-  TwAddVarCB(bar, "BETA", TW_TYPE_FLOAT, TWCB_Spiral_Set, TWCB_Spiral_Get, 
-	     &lpd_beta, "min=0.0 step=.01 label=Beta");
-
-  TwAddVarCB(bar, "THETA", TW_TYPE_FLOAT, TWCB_Spiral_Set, TWCB_Spiral_Get, 
-	     &lpd_theta, "min=1.0 step=1 label=Theta");
-
-  TwAddVarCB(bar, "PHI", TW_TYPE_FLOAT, TWCB_Spiral_Set, TWCB_Spiral_Get, 
-	     &lpd_phi, "min=1.0 step=1 label=Phi");
+  TwAddVarCB(bar, "ISOVALUE", TW_TYPE_FLOAT, TWCB_Isovalue_Set, 
+	     TWCB_Isovalue_Get, &isovalue, 
+	     "min=0.0 step=.1 label=Isovalue");
 
   TwAddVarRW(bar, "FixUP", TW_TYPE_BOOLCPP, &(cam.fixUp), 
 	     " label='Fix Up Vector' group='Camera'");
@@ -580,8 +538,6 @@ void init_ATB(){
 	     glm::value_ptr(light_dir), "label='Light Direction'");
 
 }
-#endif
-
 
 int main(int argc, const char **argv) {
 
@@ -595,14 +551,14 @@ int main(int argc, const char **argv) {
 
   glfwMakeContextCurrent(window);
   
-  //init_ATB()
+  init_ATB();
 
   parse_args(argc,argv);
   init_seek();
 
   enable_shaders("shader.vsh","shader.fsh");
 
-  poly = generate_sample(0.5f);
+  poly = generate_sample(isovalue);
   buffer_data(poly,true);
 
   glBindVertexArray(render.vao);
@@ -622,7 +578,7 @@ int main(int argc, const char **argv) {
   while(true){
     render_poly();
 
-    //TwDraw();
+    TwDraw();
     glfwWaitEvents();
     glfwSwapBuffers(window);
 
