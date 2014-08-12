@@ -1,0 +1,43 @@
+<script src="webgl-utils.js"></script>
+<script src="color_maps.js"></script>
+
+<script id="color-map-vertex-shader" type="x-shader/x-vertex">
+attribute vec2 position;
+
+varying vec2 tex_coord;
+
+void main(){
+  gl_Position = vec4(position, 0, 1.0);
+  tex_coord = position.xy;
+}
+</script>
+
+<script id="color-map-fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D tex;
+
+varying vec2 tex_coord;
+
+void main(){
+  gl_FragColor = texture2D(tex,tex_coord);
+}
+</script>
+
+<html>
+
+<head>
+	<title>A WebGL Color Maps program</title>
+</head>
+
+<body>
+	<canvas id="colorMapsGLCanvas" width="640" height="480" style="border:1px solid #000000"></canvas>
+
+<script>
+window.addEventListener("DOMContentLoaded", function(){
+	cm.init();
+}, false);
+</script>
+
+</body>
+
+</html>
