@@ -62,7 +62,7 @@ struct camera{
 
   float fov = 1.0f;
   float near_plane= .1f;
-  float far_plane= 100.0f;
+  float far_plane= 10000.0f;
 
   bool fixUp = false;
 } cam;
@@ -73,7 +73,7 @@ glm::mat4 proj = glm::perspective(cam.fov, ((float) width)/((float)height),
 				  cam.near_plane, cam.far_plane);
 glm::mat4 model = glm::mat4();
 
-glm::vec3 light_dir = glm::vec3(1.0f,0.0f,0.0f);
+glm::vec3 light_dir = cam.pos - cam.center;
 
 /* -------- Prototypes -------------------------*/
 void buffer_data(limnPolyData *lpd, bool buffer_new);
@@ -84,6 +84,8 @@ limnPolyData *generate_sample(float index);
 
 void update_view(){
   view = glm::lookAt(cam.pos,cam.center,cam.up);
+
+  light_dir = cam.pos - cam.center;
 } 
 
 void update_proj(){
