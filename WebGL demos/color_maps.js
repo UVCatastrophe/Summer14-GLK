@@ -238,7 +238,7 @@ function colorMaps(){
 	});
 
 	elm.append(num);
-
+	
 	$('#ctrlPtLast').before(elm);
 	return elm;
     };

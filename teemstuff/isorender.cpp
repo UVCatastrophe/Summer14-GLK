@@ -130,6 +130,16 @@ void TWCB_Isovalue_Get(void *value, void *clientData){
   *(float *)value = *(float*)clientData;
 }
 
+void TWCB_Print_Camera(void* clientData){
+  std::cout << "Eye Point: " << cam.pos.x << " " << cam.pos.y << " " << cam.pos.z << std::endl;
+  std::cout << "Lookat Point: " << cam.center.x << " " << cam.center.y <<  " " << cam.center.z << std::endl;
+  std::cout << "Up Vector: " << cam.up.x << " " << cam.up.y << " " << cam.up.z << std::endl;
+
+  std::cout << "Near Plane: " << cam.near_plane << " Far Plane: " << cam.far_plane << " FOV: " << cam.fov << std::endl;
+
+  std::cout << "Width: " << width << " Height: " << height;
+
+}
 
 void mouseButtonCB(GLFWwindow* w, int button, 
 		   int action, int mods){
@@ -197,7 +207,7 @@ void translate_diff(glm::vec3 diff){
   glm::vec4 invV = inv * glm::vec4(diff,0.0);
   
   glm::mat4 trans = glm::translate(glm::mat4(),
-				   glm::vec3(invV)/(float)width);
+				   glm::vec3(invV));
   cam.center = glm::vec3(trans*glm::vec4(cam.center,1.0));
   cam.pos = glm::vec3(trans*glm::vec4(cam.pos,1.0));
   update_view();
@@ -403,7 +413,7 @@ void render_poly(){
     offset += poly->icnt[i];
     GLuint error;
     if( (error = glGetError()) != GL_NO_ERROR)
-      std::cout << "GLERROR: " << error << std::endl;
+      std::cout << "ERROR: " << error << std::endl;
   }
   
 }
@@ -454,7 +464,6 @@ void buffer_data(limnPolyData *lpd, bool buffer_new){
 
   //Colors
   if(lpd->rgba != NULL){
-    std::cout << "has colors\n";
     glBindBuffer(GL_ARRAY_BUFFER, render.buffs[2]);
     if(buffer_new)
       glBufferData(GL_ARRAY_BUFFER, lpd->rgbaNum*sizeof(char)*4,
@@ -466,6 +475,7 @@ void buffer_data(limnPolyData *lpd, bool buffer_new){
   }
 
   if(buffer_new){
+
     //Indices
     glGenBuffers(1, &(render.elms));
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, render.elms);
@@ -497,12 +507,13 @@ void enable_shaders(const char* vshFile, const char* fshFile){
   render.uniforms[1] = render.shader->UniformLocation("view");
   render.uniforms[2] = render.shader->UniformLocation("model");
   render.uniforms[3] = render.shader->UniformLocation("light_dir");
+
   
 }
 
 //Initialize the ATB pannel.
 void init_ATB(){
-  TwInit(TW_OPENGL, NULL);
+  TwInit(TW_OPENGL_CORE, NULL);
 
   TwWindowSize(width,height);
 
@@ -539,11 +550,18 @@ void init_ATB(){
   TwAddVarRW(bar, "LightDir", TW_TYPE_DIR3F, 
 	     glm::value_ptr(light_dir), "label='Light Direction'");
 
+  TwAddButton(bar, "PrintCamera", TWCB_Print_Camera, NULL, 
+	      "label='Output Camera Inforamation'");
+
 }
 
 int main(int argc, const char **argv) {
 
   glfwInit();
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // Use OpenGL Core v3.2
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
   GLFWwindow *window = glfwCreateWindow(640,480, "Sample", NULL, NULL);
   if(!window){
@@ -554,6 +572,7 @@ int main(int argc, const char **argv) {
   glfwMakeContextCurrent(window);
   
   init_ATB();
+
 
   parse_args(argc,argv);
   init_seek();
@@ -579,7 +598,6 @@ int main(int argc, const char **argv) {
 
   while(true){
     render_poly();
-
     TwDraw();
     glfwWaitEvents();
     glfwSwapBuffers(window);
