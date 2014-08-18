@@ -1,4 +1,5 @@
 <script src="jquery.min.js"></script>
+<script src="image_upload_download.js"></script>
 <script src="webgl-utils.js"></script>
 <script src="color_maps.js"></script>
 
@@ -82,9 +83,12 @@ void main(){
 </div>
 </div>
 
+<div id="uploadButton" />
+
 <script>
 window.addEventListener("DOMContentLoaded", function(){
 	cm = colorMaps();
+        dl = dl();
 	cm.init();
 }, false);
 </script>

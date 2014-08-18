@@ -27,12 +27,14 @@ function colorMaps(){
 
 	$('#addCtrlPtButton').on('click',handleAddCtrlPt);
 
-	cm.initGL();
+	dl.addFileBrowser($('#uploadButton'), function(url){
+	    cm.initGL(url);
+	    cm.init_first_point();
+	});
 
-	cm.init_first_point();
     }
 
-    cm.initGL = function(){
+    cm.initGL = function(imageUrl){
 
 	cm.canvas = document.getElementById("colorMapsGLCanvas");
 	cm.gl = canvas.getContext("experimental-webgl");
@@ -67,7 +69,7 @@ function colorMaps(){
 
 	var img = new Image();
 	img.onload = function(){ init_texture(img); };
-	img.src = "test.png";
+	img.src = imageUrl;
 
     };
 
