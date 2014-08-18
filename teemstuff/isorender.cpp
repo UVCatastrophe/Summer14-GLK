@@ -40,7 +40,7 @@ TwBar *bar;
 struct render_info{
   GLuint vao = -1;
   GLuint buffs[3];
-  GLuint uniforms[4];
+  GLuint uniforms[7];
   GLuint elms;
   ShaderProgram* shader = NULL;
 } render;
@@ -401,6 +401,14 @@ void render_poly(){
   //Light Direction Uniforms
   glUniform3fv(render.uniforms[3],1,glm::value_ptr(light_dir));
   
+  //bool paint
+  glUniform1i(render.uniforms[6],(GLint)1.0);
+
+  glUniform3fv(render.uniforms[4],1,glm::value_ptr(cam.pos));
+
+  glm::vec3 dir =  cam.pos-cam.center;
+  glUniform3fv(render.uniforms[5],1,glm::value_ptr(dir));
+
   glClear(GL_DEPTH_BUFFER_BIT);
   glClear(GL_COLOR_BUFFER_BIT);
   int offset = 0;
@@ -488,13 +496,17 @@ void buffer_data(limnPolyData *lpd, bool buffer_new){
 /*Loads and enables the vertex and fragment shaders. Acquires uniforms
  * for the transformation matricies/
  */
-void enable_shaders(const char* vshFile, const char* fshFile){
+void enable_shaders(const char* vshFile, 
+		    const char* fshFile,
+		    const char* gshFile){
   //Initialize the shaders
   render.shader = new ShaderProgram(); 
   
   //Set up the shader
   render.shader->vertexShader(vshFile);
   render.shader->fragmentShader(fshFile);
+  if(gshFile != NULL)
+    render.shader->geometryShader(gshFile);
   
   glBindAttribLocation(render.shader->progId,0, "position");
   glBindAttribLocation(render.shader->progId,1, "norm");
@@ -508,6 +520,9 @@ void enable_shaders(const char* vshFile, const char* fshFile){
   render.uniforms[2] = render.shader->UniformLocation("model");
   render.uniforms[3] = render.shader->UniformLocation("light_dir");
 
+  render.uniforms[4] = render.shader->UniformLocation("origin");
+  render.uniforms[5] = render.shader->UniformLocation("ray");
+  render.uniforms[6] = render.shader->UniformLocation("pixel_trace_on");
   
 }
 
@@ -577,7 +592,7 @@ int main(int argc, const char **argv) {
   parse_args(argc,argv);
   init_seek();
 
-  enable_shaders("shader.vsh","shader.fsh");
+  enable_shaders("isorender.vsh","isorender.fsh","isorender.gsh");
 
   poly = generate_sample(isovalue);
   buffer_data(poly,true);
