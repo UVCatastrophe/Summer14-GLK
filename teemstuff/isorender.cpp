@@ -54,6 +54,8 @@ struct ui_pos{
   //0 for all, 1 for fov, 2 for just X, 3 for just y, 4 for just z
   ui_position mode;
 
+  bool shift_click = false;
+
   double last_x;
   double last_y;
 } ui;
@@ -77,6 +79,9 @@ glm::mat4 proj = glm::perspective(cam.fov, ((float) width)/((float)height),
 glm::mat4 model = glm::mat4();
 
 glm::vec3 light_dir = cam.pos - cam.center;
+
+//The ray cast out to do primitive picking
+glm::vec3 ray = cam.center-cam.pos;
 
 /*A structure which holds data specific to the userinterface */
 struct ATB_Vals{
@@ -173,6 +178,18 @@ void TWCB_Print_Camera(void* clientData){
 
 }
 
+/* castas a ray in world space from cam.pos through the point x,y
+ * and then updates 'ray' with the result.
+ * x and y are described in screenspace.
+ */
+void cast_ray(int x,int y){
+  glm::vec4 rm = glm::vec4(x/width,y/height,1.0,1.0);
+  glm::vec3 world = glm::vec3(glm::inverse(view) * glm::inverse(proj) * rm);
+  
+  ray = glm::normalize(world - cam.pos);
+
+}
+
 /*Called when the mouse button is clicked*/
 void mouseButtonCB(GLFWwindow* w, int button, 
 		   int action, int mods){
@@ -198,6 +215,11 @@ void mouseButtonCB(GLFWwindow* w, int button,
     if(pos[0] <= ui.last_x && pos[0] + tw_size[0] >= ui.last_x && 
        pos[1] <= ui.last_y && pos[1] + tw_size[1] >= ui.last_y)
       return;
+  }
+
+  if(ui.shift_click && action == GLFW_PRESS){
+    cast_ray(ui.last_x,ui.last_y);
+    return;
   }
 
   //Else, set up the mode for rotating/zooming
@@ -350,6 +372,15 @@ void screenSizeCB(GLFWwindow* win, int w, int h){
 void keyFunCB( GLFWwindow* window,int key,int scancode,int action,int mods)
 {
   //TODO: add a reset key
+  bool shift = (key == GLFW_KEY_LEFT_SHIFT) || (key == GLFW_KEY_RIGHT_SHIFT);
+  if(shift && action == GLFW_PRESS){
+    ui.shift_click = true;
+    std::cout << "here\n";
+  }
+  else if(shift && action == GLFW_RELEASE){
+    ui.shift_click = false;
+  }
+
 
   TwEventKeyGLFW( key , action );
   TwEventCharGLFW( key  , action );
@@ -539,8 +570,7 @@ void render_poly(){
 
   glUniform3fv(render.uniforms[4],1,glm::value_ptr(cam.pos));
 
-  glm::vec3 dir =  cam.pos-cam.center;
-  glUniform3fv(render.uniforms[5],1,glm::value_ptr(dir));
+  glUniform3fv(render.uniforms[5],1,glm::value_ptr(ray));
 
   glClear(GL_DEPTH_BUFFER_BIT);
   glClear(GL_COLOR_BUFFER_BIT);
