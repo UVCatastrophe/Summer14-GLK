@@ -32,6 +32,8 @@ function colorMaps(){
 	    cm.init_first_point();
 	});
 
+	$('#downloadButton').on('click',cm.downloadImage);
+
     }
 
     cm.initGL = function(imageUrl){
@@ -83,6 +85,8 @@ function colorMaps(){
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.uniform1i(cm.texLoc, 0);
+
+	cm.webglInitReady = true;
 
 	cm.draw();
 
@@ -250,6 +254,17 @@ function colorMaps(){
 	pt.off();
 	pt.remove();
     } 
+
+    cm.downloadImage = function(){
+	if(!cm.webglInitReady)
+	    return;
+
+	var canvas = $('#colorMapsGLCanvas')[0].getContext("experimental-webgl", 
+							 {preserveDrawingBuffer: true}).canvas;
+	var url = canvas.toDataURL("image/png");
+	window.location.href=url.replace("image/png", "image/octet-stream");
+	
+    }
 
     return this;
 
