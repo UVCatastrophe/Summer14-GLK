@@ -37,6 +37,9 @@ TwBar *bar;
 
 #define USE_TIME false
 
+typedef enum {UI_POS_LEFT, UI_POS_TOP, UI_POS_RIGHT,
+	      UI_POS_BOTTOM, UI_POS_CENTER } ui_position; 
+
 struct render_info{
   GLuint vao = -1;
   GLuint buffs[3];
@@ -49,7 +52,7 @@ struct ui_pos{
   bool isDown = false;
   GLuint mouseButton;
   //0 for all, 1 for fov, 2 for just X, 3 for just y, 4 for just z
-  int mode;
+  ui_position mode;
 
   double last_x;
   double last_y;
@@ -75,22 +78,47 @@ glm::mat4 model = glm::mat4();
 
 glm::vec3 light_dir = cam.pos - cam.center;
 
+/*A structure which holds data specific to the userinterface */
+struct ATB_Vals{
+  std::string fileOut = "out";//File name to be saved to for calls to take screenshot
+  bool saveDepthMap = false;
+} barVals;
+
 /* -------- Prototypes -------------------------*/
 void buffer_data(limnPolyData *lpd, bool buffer_new);
 limnPolyData *generate_sample(float index);
-
+void render_poly();
+void TWCB_take_screenshot(void* clientData);
 
 /*---------------------Function Defentions----------------*/
 
+/* Update the view Matrix using the currently saved camera parameters*/
 void update_view(){
   view = glm::lookAt(cam.pos,cam.center,cam.up);
 
   light_dir = cam.pos - cam.center;
 } 
 
+/*Update the projeciton Matrix using the currently save camera parameters*/
 void update_proj(){
   proj = glm::perspective(cam.fov, ((float) width)/((float)height),
 			  cam.near_plane, cam.far_plane);
+}
+
+/*Getters and setters for ATB values*/
+void TW_CALL TWCB_Set_String(const void *value, void *clientData)
+{
+  //Some crazy memory managment.
+  //Taken from an example in the TW documentation
+  const std::string *srcPtr = static_cast<const std::string *>(value);
+  *((std::string*)clientData) = *srcPtr;
+}
+
+void TW_CALL TWCB_Get_String(void *value, void * clientData)
+{
+  //See the same example
+  std::string *destPtr = static_cast<std::string *>(value);
+  TwCopyStdStringToLibrary(*destPtr, *((std::string*)clientData));
 }
 
 void TWCB_Cam_Set(const void *value, void *clientData){
@@ -114,6 +142,9 @@ void TWCB_Cam_Get(void *value, void *clientData){
 
 }
 
+/*Update the isovalue data, and then generate and buffer a new mesh for this
+ *isovalue.
+ */
 void TWCB_Isovalue_Set(const void *value, void *clientData){
 
   *(float*)clientData = *(float*)value;
@@ -130,6 +161,7 @@ void TWCB_Isovalue_Get(void *value, void *clientData){
   *(float *)value = *(float*)clientData;
 }
 
+/*Print the camera parameters to the commandline*/
 void TWCB_Print_Camera(void* clientData){
   std::cout << "Eye Point: " << cam.pos.x << " " << cam.pos.y << " " << cam.pos.z << std::endl;
   std::cout << "Lookat Point: " << cam.center.x << " " << cam.center.y <<  " " << cam.center.z << std::endl;
@@ -141,6 +173,7 @@ void TWCB_Print_Camera(void* clientData){
 
 }
 
+/*Called when the mouse button is clicked*/
 void mouseButtonCB(GLFWwindow* w, int button, 
 		   int action, int mods){
 
@@ -158,11 +191,14 @@ void mouseButtonCB(GLFWwindow* w, int button,
     TwGetParam(bar, NULL, "position", TW_PARAM_INT32, 2, pos);
     TwGetParam(bar,NULL, "size", TW_PARAM_INT32, 2, tw_size);
 
-    //If the event is on the ATB pannel, then return
+    /*If the event is on the ATB pannel, then return
+     *This prevents the camera from zooming/rotating while trying to click on
+     *the ATB user interface
+     */
     if(pos[0] <= ui.last_x && pos[0] + tw_size[0] >= ui.last_x && 
        pos[1] <= ui.last_y && pos[1] + tw_size[1] >= ui.last_y)
       return;
-      }
+  }
 
   //Else, set up the mode for rotating/zooming
   if(action == GLFW_PRESS){
@@ -173,18 +209,23 @@ void mouseButtonCB(GLFWwindow* w, int button,
   }
 
   if(ui.last_x <= width*.1)
-    ui.mode = 1;
+    ui.mode = UI_POS_LEFT;
   else if(ui.last_x >= width*.9)
-    ui.mode = 3;
+    ui.mode = UI_POS_RIGHT;
   else if(ui.last_y <= height*.1)
-    ui.mode = 4;
+    ui.mode = UI_POS_BOTTOM;
   else if(ui.last_y >= height*.9)
-    ui.mode = 2;
+    ui.mode = UI_POS_TOP;
   else
-    ui.mode = 0;
+    ui.mode = UI_POS_CENTER;
 
 }
 
+/* Rotate the up and pos vectors based on the given diff vector and then 
+ * updates the view matrix.
+ * This vector represents a direction vector in screen space coordinates.
+ * Its magnitude is used tot determine the angle of the rotation.
+ */
 void rotate_diff(glm::vec3 diff){
 
   glm::mat4 inv = glm::inverse(view);
@@ -202,6 +243,10 @@ void rotate_diff(glm::vec3 diff){
   update_view();
 }
 
+/*Translate the pos vector in a direction given by the diff vector.
+ *The diff vector is a displacement given in scrrenspace coordinates
+ *and the amount displaced is proportional to its magnitude
+ */
 void translate_diff(glm::vec3 diff){
   glm::mat4 inv = glm::inverse(view);
   glm::vec4 invV = inv * glm::vec4(diff,0.0);
@@ -212,6 +257,7 @@ void translate_diff(glm::vec3 diff){
   cam.pos = glm::vec3(trans*glm::vec4(cam.pos,1.0));
   update_view();
 }
+
 
 void mousePosCB(GLFWwindow* w, double x, double y){
   //If zooming/rotating is not occuring, just pass to ATB
@@ -224,7 +270,7 @@ void mousePosCB(GLFWwindow* w, double x, double y){
   float y_diff = ui.last_y - y;
   
   //Standard (middle of the screen mode)
-  if(ui.mode == 0){
+  if(ui.mode == UI_POS_CENTER){
 
     //Rotate
     if(ui.mouseButton == GLFW_MOUSE_BUTTON_1){
@@ -239,7 +285,7 @@ void mousePosCB(GLFWwindow* w, double x, double y){
   }
   
   //Zooming Mode
-  else if(ui.mode == 1){
+  else if(ui.mode == UI_POS_LEFT){
 
     //FOV zoom
     if(ui.mouseButton == GLFW_MOUSE_BUTTON_1){
@@ -252,7 +298,7 @@ void mousePosCB(GLFWwindow* w, double x, double y){
   }
 
   //modify u only
-   else if(ui.mode == 4){
+   else if(ui.mode == UI_POS_TOP){
      if(ui.mouseButton == GLFW_MOUSE_BUTTON_1){
        if(x_diff != 0.0) //Can't rotate by 0
 	 rotate_diff(glm::vec3(-x_diff,0.0f,0.0f));
@@ -262,7 +308,7 @@ void mousePosCB(GLFWwindow* w, double x, double y){
    }
 
   //modify v only
-   else if(ui.mode == 3){
+   else if(ui.mode == UI_POS_RIGHT){
      if(ui.mouseButton == GLFW_MOUSE_BUTTON_1){
        if(y_diff != 0.0)
 	 rotate_diff(glm::vec3(0.0f,y_diff,0.0f));
@@ -272,7 +318,7 @@ void mousePosCB(GLFWwindow* w, double x, double y){
    }
 
   //modify w only
-   else if(ui.mode == 2){
+   else if(ui.mode == UI_POS_BOTTOM){
      if(ui.mouseButton == GLFW_MOUSE_BUTTON_1){
        float angle = (x_diff*3.1415*2) / width;
        glm::mat4 rot = glm::rotate(glm::mat4(),angle,
@@ -312,6 +358,93 @@ void keyFunCB( GLFWwindow* window,int key,int scancode,int action,int mods)
 void mouseScrollCB(  GLFWwindow* window, double x , double y )
 {
   TwEventMouseWheelGLFW( (int)y );
+}
+
+/* Takes a screenshot of the current image/depthbuffer and saves it as a png.
+ * Uses the name given by barVals.fileOut 
+ */
+void TWCB_take_screenshot(void* clientData){
+  
+  GLuint fbo, rboColor, rboDepth;
+
+  /* Create the buffers to do a rendering pass into*/
+  glGenRenderbuffers(1, &rboColor);
+  glBindRenderbuffer(GL_RENDERBUFFER,rboColor);
+
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB, 
+			width,height);
+
+  glGenRenderbuffers(1, &rboDepth);
+  glBindRenderbuffer(GL_RENDERBUFFER,rboDepth);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24,
+			width,height);
+
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER,fbo);
+  glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, 
+			    GL_COLOR_ATTACHMENT0,
+			    GL_RENDERBUFFER,
+			    rboColor);
+  glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, 
+			    GL_DEPTH_ATTACHMENT,
+			    GL_RENDERBUFFER,
+			    rboDepth);
+  //Bind the new buffers to the framebuffer
+  glBindFramebuffer(GL_FRAMEBUFFER,fbo);
+  glReadBuffer(GL_COLOR_ATTACHMENT0); 
+ 
+  /*Render the image into the buffer*/
+  render_poly();
+
+  //The rendered image is read into ss
+  GLvoid *ss = malloc(sizeof(unsigned char)*3*width*height);
+  glReadPixels(0,0,width,height,GL_RGB,
+	       GL_UNSIGNED_BYTE,ss);
+
+  //Used to save the rendered image
+  Nrrd *nflip = nrrdNew();
+  Nrrd *nout = nrrdNew();
+
+  char* err;
+    //Saves the contents of the buffer as a png image
+    //Currently upsidedown
+
+if (nrrdWrap_va(nflip, ss, nrrdTypeUChar, 3,
+		(size_t)3, (size_t)width, (size_t)height)
+    || nrrdFlip(nout,nflip, 2) ||  nrrdSave((barVals.fileOut + std::string(".png")).c_str(), nout, NULL)) {
+      err = biffGetDone(NRRD);
+      fprintf(stderr, "trouble wrapping image:\n%s", err);
+      free(err);
+      return;
+    }
+
+
+
+ if(barVals.saveDepthMap){
+   nrrdNuke(nout);
+   nrrdNuke(nflip);
+   nout = nrrdNew();
+   nflip = nrrdNew();
+
+   ss = malloc(sizeof(float)*width*height);
+   glReadPixels(0,0,width,height,GL_DEPTH_COMPONENT, GL_FLOAT,ss);
+   if(nrrdWrap_va(nflip,ss,nrrdTypeFloat, 3,(size_t)1, 
+		  (size_t)width,(size_t)height) ||
+      nrrdFlip(nout,nflip,2) ||
+      nrrdSave((barVals.fileOut+std::string("Depth.png")).c_str(),nout,NULL)){
+     err = biffGetDone(NRRD);
+     fprintf(stderr, "trouble wrapping/flippings/saving depthmap: %s\n",err);
+     free(err);
+     return;
+   }
+ }
+
+ nrrdNuke(nout);
+ nrrdNuke(nflip);
+
+  //rebind the frambuffer to the screen
+ glBindFramebuffer (GL_FRAMEBUFFER, 0);
+
 }
 
 /* Converts a teem enum to an openGL enum */
@@ -567,6 +700,16 @@ void init_ATB(){
 
   TwAddButton(bar, "PrintCamera", TWCB_Print_Camera, NULL, 
 	      "label='Output Camera Inforamation'");
+
+  TwAddButton(bar, "ScreenShot", TWCB_take_screenshot, NULL,
+	      "label='Screenshot' group='Screenshot'");
+
+  TwAddVarRW(bar, "SaveDepthMap", TW_TYPE_BOOLCPP, &(barVals.saveDepthMap),
+	     "label='Save Depth Map?' group='Screenshot'");
+
+  TwAddVarCB(bar, "ScreenshotName", TW_TYPE_STDSTRING, 
+	     TWCB_Set_String, TWCB_Get_String, &(barVals.fileOut), 
+	     "label='Screenshot Name' group='Screenshot'");
 
 }
 
