@@ -46,6 +46,11 @@ struct render_info{
   GLuint uniforms[7];
   GLuint elms;
   ShaderProgram* shader = NULL;
+
+  GLuint fbo_ext = -1;
+  GLuint rbo_ext_color;
+  GLuint rbo_ext_depth;
+
 } render;
 
 struct ui_pos{
@@ -66,8 +71,8 @@ struct camera{
   glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
   float fov = 1.0f;
-  float near_plane= .1f;
-  float far_plane= 10000.0f;
+  float near_plane= 1.0f;
+  float far_plane= 1000.0f;
 
   bool fixUp = false;
 } cam;
@@ -82,6 +87,7 @@ glm::vec3 light_dir = cam.pos - cam.center;
 
 //The ray cast out to do primitive picking
 glm::vec3 ray = cam.center-cam.pos;
+glm::vec3 origin = cam.center;
 
 /*A structure which holds data specific to the userinterface */
 struct ATB_Vals{
@@ -94,6 +100,7 @@ void buffer_data(limnPolyData *lpd, bool buffer_new);
 limnPolyData *generate_sample(float index);
 void render_poly();
 void TWCB_take_screenshot(void* clientData);
+void bind_external_buffer();
 
 /*---------------------Function Defentions----------------*/
 
@@ -178,16 +185,33 @@ void TWCB_Print_Camera(void* clientData){
 
 }
 
+/* Performs a rendering pass to get the depth map for the current image.
+ * Then returns the value at x,y in the map
+ */
+float getDepthAt(int x, int y){
+  float z;
+
+  bind_external_buffer();
+  glReadBuffer(GL_COLOR_ATTACHMENT0);   
+  render_poly();
+
+  glReadPixels(x,y,1,1,GL_DEPTH_COMPONENT, GL_FLOAT,&z);
+
+  glBindFramebuffer (GL_FRAMEBUFFER, 0);
+  return z;
+  
+}
+
 /* castas a ray in world space from cam.pos through the point x,y
  * and then updates 'ray' with the result.
  * x and y are described in screenspace.
  */
-void cast_ray(float x,float y){
-  glm::vec4 rm = glm::vec4(1.0 - 2.0f*(x/(float)width), 2.0f*(y/(float)height) -1.0f ,0.0f,1.0f);
-  rm = glm::inverse(view) * glm::inverse(proj) * rm;
-  glm::vec3 world = glm::vec3(rm / rm.w);
-  
-  ray = world - cam.pos;
+void cast_ray(float x_screen,float y_screen){
+  float z  = getDepthAt(x_screen,y_screen);
+
+  glm::vec4 viewport = glm::vec4(0,0,width,height);
+  glm::vec3 wincoord = glm::vec3(x_screen,height-y_screen-1,z);
+  ray = glm::unProject(wincoord,view,proj,viewport);
 
 }
 
@@ -391,37 +415,47 @@ void mouseScrollCB(  GLFWwindow* window, double x , double y )
   TwEventMouseWheelGLFW( (int)y );
 }
 
+/*Sets up (if necessary) and then binds an rgb and depth buffer
+ *to the rbo render_info.rbo_ext
+ */
+void bind_external_buffer(){
+  /*first time calling bind_external_buffer. Generate the rbo's/fbo
+   *and then allocate space for them */
+  if(render.fbo_ext == -1){
+    glGenRenderbuffers(1, &(render.rbo_ext_color));
+
+    glBindRenderbuffer(GL_RENDERBUFFER,render.rbo_ext_color);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB, 
+			  width,height);
+    
+    glGenRenderbuffers(1, &(render.rbo_ext_depth));
+    glBindRenderbuffer(GL_RENDERBUFFER,render.rbo_ext_depth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24,
+			  width,height);
+    
+    glGenFramebuffers(1, &(render.fbo_ext));
+    glBindFramebuffer(GL_FRAMEBUFFER,render.fbo_ext);
+    glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, 
+			      GL_COLOR_ATTACHMENT0,
+			      GL_RENDERBUFFER,
+			      render.rbo_ext_color);
+    glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, 
+			      GL_DEPTH_ATTACHMENT,
+			      GL_RENDERBUFFER,
+			      render.rbo_ext_depth);
+  }
+
+  glBindFramebuffer(GL_FRAMEBUFFER,render.fbo_ext);
+  
+}
+
 /* Takes a screenshot of the current image/depthbuffer and saves it as a png.
  * Uses the name given by barVals.fileOut 
  */
 void TWCB_take_screenshot(void* clientData){
-  
-  GLuint fbo, rboColor, rboDepth;
+ 
+  bind_external_buffer();
 
-  /* Create the buffers to do a rendering pass into*/
-  glGenRenderbuffers(1, &rboColor);
-  glBindRenderbuffer(GL_RENDERBUFFER,rboColor);
-
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB, 
-			width,height);
-
-  glGenRenderbuffers(1, &rboDepth);
-  glBindRenderbuffer(GL_RENDERBUFFER,rboDepth);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24,
-			width,height);
-
-  glGenFramebuffers(1, &fbo);
-  glBindFramebuffer(GL_FRAMEBUFFER,fbo);
-  glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, 
-			    GL_COLOR_ATTACHMENT0,
-			    GL_RENDERBUFFER,
-			    rboColor);
-  glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, 
-			    GL_DEPTH_ATTACHMENT,
-			    GL_RENDERBUFFER,
-			    rboDepth);
-  //Bind the new buffers to the framebuffer
-  glBindFramebuffer(GL_FRAMEBUFFER,fbo);
   glReadBuffer(GL_COLOR_ATTACHMENT0); 
  
   /*Render the image into the buffer*/
@@ -565,7 +599,7 @@ void render_poly(){
   //Light Direction Uniforms
   glUniform3fv(render.uniforms[3],1,glm::value_ptr(light_dir));
 
-  glUniform3fv(render.uniforms[4],1,glm::value_ptr(cam.pos));
+  glUniform3fv(render.uniforms[4],1,glm::value_ptr(origin));
 
   glUniform3fv(render.uniforms[5],1,glm::value_ptr(ray));
 
@@ -588,7 +622,6 @@ void render_poly(){
   }
   
 }
-
 
 
 /* Buffer the data stored in the global limPolyData Poly.
@@ -760,7 +793,6 @@ int main(int argc, const char **argv) {
   glfwMakeContextCurrent(window);
   
   init_ATB();
-
 
   parse_args(argc,argv);
   init_seek();
