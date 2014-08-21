@@ -182,11 +182,12 @@ void TWCB_Print_Camera(void* clientData){
  * and then updates 'ray' with the result.
  * x and y are described in screenspace.
  */
-void cast_ray(int x,int y){
-  glm::vec4 rm = glm::vec4(x/width,y/height,1.0,1.0);
-  glm::vec3 world = glm::vec3(glm::inverse(view) * glm::inverse(proj) * rm);
+void cast_ray(float x,float y){
+  glm::vec4 rm = glm::vec4(1.0 - 2.0f*(x/(float)width), 2.0f*(y/(float)height) -1.0f ,0.0f,1.0f);
+  rm = glm::inverse(view) * glm::inverse(proj) * rm;
+  glm::vec3 world = glm::vec3(rm / rm.w);
   
-  ray = glm::normalize(world - cam.pos);
+  ray = world - cam.pos;
 
 }
 
@@ -375,7 +376,6 @@ void keyFunCB( GLFWwindow* window,int key,int scancode,int action,int mods)
   bool shift = (key == GLFW_KEY_LEFT_SHIFT) || (key == GLFW_KEY_RIGHT_SHIFT);
   if(shift && action == GLFW_PRESS){
     ui.shift_click = true;
-    std::cout << "here\n";
   }
   else if(shift && action == GLFW_RELEASE){
     ui.shift_click = false;
@@ -564,13 +564,13 @@ void render_poly(){
 
   //Light Direction Uniforms
   glUniform3fv(render.uniforms[3],1,glm::value_ptr(light_dir));
-  
-  //bool paint
-  glUniform1i(render.uniforms[6],(GLint)1.0);
 
   glUniform3fv(render.uniforms[4],1,glm::value_ptr(cam.pos));
 
   glUniform3fv(render.uniforms[5],1,glm::value_ptr(ray));
+
+  //bool paint
+  glUniform1i(render.uniforms[6],(GLint)1.0);
 
   glClear(GL_DEPTH_BUFFER_BIT);
   glClear(GL_COLOR_BUFFER_BIT);

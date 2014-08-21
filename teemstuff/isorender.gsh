@@ -28,7 +28,7 @@ void main(){
        vec3 p1 = vec3(gl_in[1].gl_Position);
        vec3 p2 = vec3(gl_in[2].gl_Position);
        vec3 normal = cross((p1-p0),(p2-p0));
-       float t = - dot((origin - ray),normal) / dot(ray,normal);
+       float t = -(dot(normal,origin) + dot(normal,p0)) / dot(ray,normal);
        vec3 x = origin + t*ray;
 
        if( dot(cross((p1-p0),(x-p0)),normal) >= 0 &&
