@@ -282,8 +282,11 @@ void rotate_diff(glm::vec3 diff){
   float angle = (glm::length(diff) * 2*3.1415 ) / width;
   
   //Create a rotation matrix around norm.
-  glm::mat4 rot = glm::rotate(glm::mat4(),angle,norm);
-  cam.pos = glm::vec3(rot * glm::vec4(cam.pos,0.0));
+  glm::mat4 rot = glm::rotate(glm::mat4(),angle,glm::normalize(norm));
+  //Align the origin with the look-at point of the camera.
+  glm::mat4 trans = glm::translate(glm::mat4(), -cam.center);
+  cam.pos = glm::vec3(glm::inverse(trans)*rot*trans*glm::vec4(cam.pos,1.0));
+  glm::vec3 nor = glm::vec3(rot*glm::vec4(cam.pos,1.0));
   if(!cam.fixUp)
     cam.up = glm::vec3(rot*glm::vec4(cam.up,0.0));
 
