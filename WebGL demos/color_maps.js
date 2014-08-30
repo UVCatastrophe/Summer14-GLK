@@ -3,10 +3,31 @@ function colorMaps(){
     var cm = this;
     cm.max_pts = 10;
 
+    /*Unifrom Variables*/
     cm.ctrl_pt_dom = [];
     cm.ctrl_pts = new Array(cm.max_pts);
     cm.ctrl_colors = new Array(cm.max_pts*3);
     cm.pts_used = 0;
+    cm.aspectRatioMat = new Array(1.0, 0.0,
+				  0.0,1.0);
+
+
+    cm.setAspectRatio = function(imgWidth,imgHeight){
+	var canvas = $('#colorMapsGLCanvas');
+	var winWidth = canvas.attr('width');
+	var winHeight = canvas.attr('height');
+	
+	if(imgWidth > imgHeight){
+	    cm.aspectRatioMat[3] = winWidth / (winHeight * (imgWidth/imgHeight));
+	    cm.aspectRatioMat[0] = 1.0;
+}
+	else{
+	    cm.aspectRatioMat[0] = (winHeight * (imgWidth/imgHeight)) / winWidth;
+	    cm.aspectRatioMat[3] = 1.0;
+}
+
+    }
+
 
     cm.toHexColor = function(index){
 	var num = (cm.ctrl_colors[index*3 + 2] * 255);
@@ -64,6 +85,8 @@ function colorMaps(){
 	gl.enableVertexAttribArray(cm.positionLoc);
 	gl.vertexAttribPointer(cm.positionLoc,2,gl.FLOAT,false,0,0);
 
+	cm.aspectRatioLoc = gl.getUniformLocation(cm.program, "aspectRatio");
+
 	cm.texLoc = gl.getUniformLocation(cm.program, "tex");
 	cm.ptsLoc = gl.getUniformLocation(cm.program, "ctrl_pts");
 	cm.colorsLoc = gl.getUniformLocation(cm.program, "ctrl_colors");
@@ -88,6 +111,8 @@ function colorMaps(){
 
 	cm.webglInitReady = true;
 
+	cm.setAspectRatio(img.width,img.height);
+
 	cm.draw();
 
     }
@@ -98,6 +123,8 @@ function colorMaps(){
 	gl.uniform3fv(cm.colorsLoc,
 		      new Float32Array(cm.ctrl_colors));
 	gl.uniform1i(cm.ptsUsedLoc,cm.pts_used);
+	gl.uniformMatrix2fv(cm.aspectRatioLoc,false,
+			    new Float32Array(cm.aspectRatioMat));
 
 	window.requestAnimFrame(cm.draw, cm.canvas);
 	gl.drawArrays(gl.TRIANGLE_FAN,0,4);
@@ -244,16 +271,21 @@ function colorMaps(){
 	});
 
 	elm.append(num);
+
+	var deleteButton = $('<button>X</button>');
+	deleteButton.on('click', function(){
+	    elm.remove();
+	    var index = cm.getIndex(elm);
+	    cm.ctrl_pts.splice(index,1);
+	    cm.ctrl_colors.splice(index*3,3);
+	    cm.ctrl_pt_dom.splice(index,1);
+	    cm.pts_used--;
+	});
+	elm.append(deleteButton);
 	
 	$('#ctrlPtLast').before(elm);
 	return elm;
     };
-
-    cm.removeCtrlPt = function(num){
-	var pt = $('ctrlPtElm'+num);
-	pt.off();
-	pt.remove();
-    } 
 
     cm.downloadImage = function(){
 	if(!cm.webglInitReady)
