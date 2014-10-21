@@ -418,12 +418,14 @@ void render_poly(){
   glClear(GL_DEPTH_BUFFER_BIT);
   glClear(GL_COLOR_BUFFER_BIT);
   int offset = 0;
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, render.elms);
   //Render all specified primatives
   for(int i = 0; i < poly->primNum; i++){
     GLuint prim = get_prim(poly->type[i]);
     
     glDrawElements( prim, poly->icnt[i], 
-		    GL_UNSIGNED_INT, ((void*) 0) + offset);
+		    GL_UNSIGNED_INT, ((void*) 0));
     offset += poly->icnt[i];
     GLuint error;
     if( (error = glGetError()) != GL_NO_ERROR)
@@ -581,7 +583,7 @@ int main(int argc, const char **argv) {
   
   init_ATB();
 
-  enable_shaders("shader.vsh","shader.fsh");
+  enable_shaders("polydemo.vsh","polydemo.fsh");
 
   poly = generate_spiral(lpd_alpha,lpd_beta, lpd_theta, lpd_phi);
   buffer_data(poly,true);
@@ -602,7 +604,6 @@ int main(int argc, const char **argv) {
 
   while(true){
     render_poly();
-
     TwDraw();
     glfwWaitEvents();
     glfwSwapBuffers(window);

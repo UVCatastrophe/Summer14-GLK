@@ -649,15 +649,19 @@ void render_poly(){
   //bool paint
   glUniform1i(render.uniforms[6],(GLint)1.0);
 
+
   glClear(GL_DEPTH_BUFFER_BIT);
   glClear(GL_COLOR_BUFFER_BIT);
   int offset = 0;
   //Render all specified primatives
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, render.elms);
+  glBindVertexArray(render.vao);
+
   for(int i = 0; i < poly->primNum; i++){
     GLuint prim = get_prim(poly->type[i]);
-    
     glDrawElements( prim, poly->icnt[i], 
-		    GL_UNSIGNED_INT, ((void*) 0) + offset);
+		    GL_UNSIGNED_INT,  0);
     offset += poly->icnt[i];
     GLuint error;
     if( (error = glGetError()) != GL_NO_ERROR)
@@ -683,8 +687,10 @@ void buffer_data(limnPolyData *lpd, bool buffer_new){
     
     glBindVertexArray(render.vao);
     glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
+    if(lpd->norm != NULL)
+      glEnableVertexAttribArray(1);
+    if(lpd->rgba != NULL)
+      glEnableVertexAttribArray(2);
   }
 
   //Verts
@@ -828,7 +834,7 @@ int main(int argc, const char **argv) {
     std::cout << "failed to initialize glfw\n";
     exit(EXIT_FAILURE);
   }
-  std::cout << "here\n";
+ 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // Use OpenGL Core v3.2
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -845,12 +851,14 @@ int main(int argc, const char **argv) {
 
   glfwMakeContextCurrent(window);
   
+
   init_ATB();
 
   parse_args(argc,argv);
   init_seek();
 
   enable_shaders("isorender.vsh","isorender.fsh","isorender.gsh");
+
 
   poly = generate_sample(isovalue);
   buffer_data(poly,true);
@@ -868,6 +876,7 @@ int main(int argc, const char **argv) {
 
 
   glEnable(GL_DEPTH_TEST);
+
 
   while(true){
     render_poly();
