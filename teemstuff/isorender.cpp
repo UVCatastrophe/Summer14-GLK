@@ -123,7 +123,13 @@ void update_view(){
 void update_proj(){
   proj = glm::perspective(cam.fov, ((float) width)/((float)height),
 			  cam.near_plane, cam.far_plane);
+
 }
+
+static void error_callback(int error, const char* description){
+  fputs(description, stderr);
+}
+
 
 /*-----Callbacks for AntTweakBar Events---------*/
 
@@ -816,14 +822,23 @@ void init_ATB(){
 
 int main(int argc, const char **argv) {
 
-  glfwInit();
+  glfwSetErrorCallback(error_callback);
+
+  if(!glfwInit()){
+    std::cout << "failed to initialize glfw\n";
+    exit(EXIT_FAILURE);
+  }
+  std::cout << "here\n";
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // Use OpenGL Core v3.2
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  //glfwWindowHint(GLFW_OPENGL_PROFILE, 0);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  
 
   GLFWwindow *window = glfwCreateWindow(640,480, "Sample", NULL, NULL);
   if(!window){
+    std::cout << "failed to create context\n";
     glfwTerminate();
     exit(EXIT_FAILURE);
   }
