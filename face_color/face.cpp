@@ -32,6 +32,9 @@ GLfloat color2[3] = {0.5,0.5,0.5};
  */
 GLuint shaderUniforms[4];
 
+GLuint vao;
+GLuint bufs[1];
+
 /*Main display window*/
 GLFWwindow* window;
 
@@ -110,10 +113,13 @@ bool parse_args(int num, char** args){
 }
 
 void render(void){
+
   glUniform3f(shaderUniforms[1],color1[0],color1[1],color1[2]);
   glUniform3f(shaderUniforms[2],color2[0],color2[1],color2[2]);
 
   glClear(GL_COLOR_BUFFER_BIT);
+
+  glBindVertexArray(vao);
 
   glDrawArrays(GL_TRIANGLE_FAN,0,4);
 
@@ -155,14 +161,12 @@ void init(void){
   init_TW();
 
   //-------Load the Vertex data-------
-  GLuint vao;
-  GLuint bufs[1];
   glGenVertexArrays(1,&vao);
   glGenBuffers(1,bufs);
   
   glBindVertexArray(vao);
   glEnableVertexAttribArray(POSITION_ATTRIB);
-  glEnableVertexAttribArray(COLOR_ATTRIB);
+  // glEnableVertexAttribArray(COLOR_ATTRIB);
 
   glBindBuffer(GL_ARRAY_BUFFER, bufs[0]);
   glBufferData(GL_ARRAY_BUFFER, 4*3*sizeof(GLfloat), 
