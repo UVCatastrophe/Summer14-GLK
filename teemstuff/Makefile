@@ -1,10 +1,18 @@
-TEEM = /home/glk/roman/teem-install
-GLM = /home/glk/roman/glm/
-ATB = /home/glk/roman/AntTweakBar
-
+RT = /home/glk/roman
+TEEM = $(RT)/teem-install
+GLM = $(RT)/glm
+ATB = $(RT)/AntTweakBar
 
 CC = g++ -std=c++11 
-FLAGS = -lglfw3 -lGLU -lGL -lX11 -lXxf86vm -lXrandr -lpthread -lXi -Wl,-rpath,$(TEEM)/lib -Wl,-rpath,$(ATB)/lib -lteem -lpng -lAntTweakBar -fpermissive
+
+OS := $(shell uname)
+ifeq ($(OS), Darwin)
+OS_FLAGS = -lglfw -framework CoreVideo  -framework Cocoa -framework OpenGL -framework IOKit 
+else
+OS_FLAGS = -lglfw3 -lGLU -lGL -lX11 -lXxf86vm -lXrandr -lpthread -lXi
+endif
+
+FLAGS =  -Wl,-rpath,$(TEEM)/lib -Wl,-rpath,$(ATB)/lib -lteem  -lAntTweakBar -fpermissive
 INCLUDE = -I$(TEEM)/include -I$(GLM) -I$(ATB)/include/
 LIB = -L$(TEEM)/lib -L$(GLM) -L$(ATB)/lib/
 
@@ -15,8 +23,8 @@ SRC_ISORENDER = isorender.cpp shader.cpp
 OUT_ISORENDER = -o isorender
 
 All:
-	$(CC) $(SRC_POLYDEMO) -o main $(FLAGS) $(LIB) $(INCLUDE)
+	$(CC) $(SRC_POLYDEMO) -o main $(OS_FLAGS) $(FLAGS) $(LIB) $(INCLUDE)
 poly:
-	$(CC) $(SRC_POLYDEMO) $(OUT_POLYDEMO) $(FLAGS) $(LIB) $(INCLUDE)
+	$(CC) $(SRC_POLYDEMO) $(OUT_POLYDEMO) $(OS_FLAGS) $(FLAGS) $(LIB) $(INCLUDE)
 iso:
-	$(CC) $(SRC_ISORENDER) $(OUT_ISORENDER) $(FLAGS) $(LIB) $(INCLUDE)
+	$(CC) $(SRC_ISORENDER) $(OUT_ISORENDER) $(OS_FLAGS) $(FLAGS) $(LIB) $(INCLUDE)

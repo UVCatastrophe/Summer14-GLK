@@ -3,7 +3,18 @@
 #define GLM_FORCE_RADIANS
 #define GLFW_INCLUDE_GLU
 #define GL_GLEXT_PROTOTYPES
+#if defined(__APPLE_CC__)
+#define GLFW_INCLUDE_GLCOREARB
+#endif
+
 #include <GLFW/glfw3.h>
+
+#if defined(__APPLE_CC__)
+#include <OpenGL/glext.h>
+
+#else
+#  include <GL/glext.h>
+#endif
 #include <teem/air.h>
 #include <teem/biff.h>
 #include <teem/nrrd.h>

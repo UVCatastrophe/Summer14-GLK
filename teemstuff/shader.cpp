@@ -1,7 +1,16 @@
 #include "shader.h"
 #include <sys/stat.h>
 #include <cstring>
+
+#if defined(__APPLE_CC__)
+#define GLFW_INCLUDE_GLCOREARB
+#endif
+
 #include <GLFW/glfw3.h>
+
+#if defined(__APPLE_CC__)
+#include <OpenGL/glext.h>
+#endif
 #include <iostream>
 
 ShaderProgram::ShaderProgram(){
