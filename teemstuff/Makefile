@@ -1,4 +1,4 @@
-RT = /home/glk/roman
+RT = /Users/ramici
 TEEM = $(RT)/teem-install
 GLM = $(RT)/glm
 ATB = $(RT)/AntTweakBar

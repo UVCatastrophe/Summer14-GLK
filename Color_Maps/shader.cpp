@@ -1,13 +1,23 @@
 #include "shader.h"
 #include <sys/stat.h>
 #include <cstring>
+
+#if defined(__APPLE_CC__)
+#define GLFW_INCLUDE_GLCOREARB
+#endif
+
 #include <GLFW/glfw3.h>
+
+#if defined(__APPLE_CC__)
+#include <OpenGL/glext.h>
+#endif
 #include <iostream>
 
 ShaderProgram::ShaderProgram(){
+  this->fshId = -1;
+  this->vshId = -1;
+  this->gshId = -1;
   this->progId = glCreateProgram();
-  this->vshId = glCreateShader(GL_VERTEX_SHADER);
-  this->fshId = glCreateShader(GL_FRAGMENT_SHADER);
 }
 
 //Proded by the Wikibook : http://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_02
@@ -89,16 +99,28 @@ void ShaderProgram::shader_LoadFromFile (const char *file, int kind,int id)
 
 }
 
+bool ShaderProgram::geometryEnabled(){
+  return this->gshId != -1;
+}
+
 bool ShaderProgram::vertexShader(const char* file){
+  this->vshId = glCreateShader(GL_VERTEX_SHADER);
   this->shader_LoadFromFile(file, GL_VERTEX_SHADER, this->vshId);
   glAttachShader(this->progId, this->vshId);
   return true;
 }
 
 bool ShaderProgram::fragmentShader(const char* file){
+  this->fshId = glCreateShader(GL_FRAGMENT_SHADER);
   this->shader_LoadFromFile(file,GL_FRAGMENT_SHADER,this->fshId);
   glAttachShader(this->progId, this->fshId);
   return true;
+}
+
+bool ShaderProgram::geometryShader(const char* file){
+  this->gshId = glCreateShader(GL_GEOMETRY_SHADER);
+  this->shader_LoadFromFile(file,GL_GEOMETRY_SHADER,this->gshId);
+  glAttachShader(this->progId,this->gshId);
 }
 
 //Taken from the CS237 library created by John Reppy

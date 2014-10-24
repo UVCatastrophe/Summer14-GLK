@@ -2,19 +2,16 @@
 
 #define GLM_FORCE_RADIANS
 #define GLFW_INCLUDE_GLU
-#define GL_GLEXT_PROTOTYPES
-#if defined(__APPLE_CC__)
+#define GLFW_GLEXT_PROTOTYPES
 #define GLFW_INCLUDE_GLCOREARB
-#endif
-
 #include <GLFW/glfw3.h>
 
 #if defined(__APPLE_CC__)
 #include <OpenGL/glext.h>
-
 #else
 #  include <GL/glext.h>
 #endif
+
 #include <teem/air.h>
 #include <teem/biff.h>
 #include <teem/nrrd.h>
@@ -849,7 +846,6 @@ int main(int argc, const char **argv) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // Use OpenGL Core v3.2
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  //glfwWindowHint(GLFW_OPENGL_PROFILE, 0);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   
 

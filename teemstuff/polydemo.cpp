@@ -2,8 +2,15 @@
 
 #define GLM_FORCE_RADIANS
 #define GLFW_INCLUDE_GLU
-#define GL_GLEXT_PROTOTYPES
+#define GLFW_INCLUDE_GLCOREARB
 #include <GLFW/glfw3.h>
+
+#if defined(__APPLE_CC__)
+#include <OpenGL/glext.h>
+#else
+#  include <GL/glext.h>
+#endif
+
 #include <teem/air.h>
 #include <teem/biff.h>
 #include <teem/nrrd.h>
@@ -521,7 +528,7 @@ void enable_shaders(const char* vshFile, const char* fshFile){
 
 //Initialize the ATB pannel.
 void init_ATB(){
-  TwInit(TW_OPENGL, NULL);
+  TwInit(TW_OPENGL_CORE, NULL);
 
   TwWindowSize(width,height);
 
@@ -572,6 +579,11 @@ void init_ATB(){
 int main(int argc, const char **argv) {
   
   glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // Use OpenGL Core v3.2
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
 
   GLFWwindow *window = glfwCreateWindow(640,480, "Sample", NULL, NULL);
   if(!window){

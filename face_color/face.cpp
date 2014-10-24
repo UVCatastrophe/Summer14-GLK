@@ -2,7 +2,15 @@
 
 #define GLFW_INCLUDE_GLU
 #define GL_GLEXT_PROTOTYPES
+#define GLFW_INCLUDE_GLCOREARB
 #include <GLFW/glfw3.h>
+
+#if defined(__APPLE_CC__)
+#include <OpenGL/glext.h>
+#else
+#  include <GL/glext.h>
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
@@ -129,7 +137,7 @@ void render(void){
 void init_TW(){
   glfwMakeContextCurrent(windowATB);
 
-  TwInit(TW_OPENGL, NULL);
+  TwInit(TW_OPENGL_CORE, NULL);
 
   TwWindowSize(200,300);
 
@@ -265,6 +273,11 @@ int main(int numArgs, char** args){
   glfwSetErrorCallback(error_callback);
   if (!glfwInit())
     exit(EXIT_FAILURE);
+    
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // Use OpenGL Core v3.2
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
   window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
   if (!window)

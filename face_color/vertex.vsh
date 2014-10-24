@@ -1,4 +1,4 @@
-#version 130
+#version 150 core
 
 in vec3 position;
 out vec3 vcol;

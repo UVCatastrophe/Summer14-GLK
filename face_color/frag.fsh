@@ -1,4 +1,4 @@
-#version 130
+#version 150 core
 
 uniform sampler2D TextureUniform;
 uniform vec3 color1;
